@@ -1,0 +1,23 @@
+version: '2'
+volumes:
+  mysql:
+services:
+  apache:
+    build: ./apache
+    ports:
+      - 80:80
+    volumes:
+      - ./www:/var/www/html
+      - ./apache/date-timezone.conf:/etc/apache2/conf-enabled/date-timezone.conf
+  mysql:
+    image: "mysql:5.5"
+    volumes:
+      - ./mysql/conf.d:/etc/mysql/conf.d
+      - mysql:/var/lib/mysql
+    ports:
+      - 3306:3306
+    environment:
+      - MYSQL_ALLOW_EMPTY_PASSWORD=true
+      - MYSQL_USER=bitrix
+      - MYSQL_PASSWORD=bitrix
+      - MYSQL_DATABASE=bitrix
