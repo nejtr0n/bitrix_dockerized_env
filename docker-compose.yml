@@ -9,6 +9,7 @@ services:
     volumes:
       - ./www:/var/www/html
       - ./apache/date-timezone.conf:/etc/apache2/conf-enabled/date-timezone.conf
+      - ./apache/encoding.conf:/etc/apache2/conf-enabled/encoding.conf
   mysql:
     image: "mysql:5.5"
     volumes:
