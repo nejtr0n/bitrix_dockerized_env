@@ -1,24 +1,32 @@
 version: '2'
 volumes:
-  mysql:
+  mysql_data:
 services:
   apache:
     build: ./apache
     ports:
-      - 80:80
+      - 8000:80
     volumes:
       - ./www:/var/www/html
-      - ./apache/date-timezone.conf:/etc/apache2/conf-enabled/date-timezone.conf
-      - ./apache/encoding.conf:/etc/apache2/conf-enabled/encoding.conf
-  mysql:
-    image: "mysql:5.5"
-    volumes:
-      - ./mysql/conf.d:/etc/mysql/conf.d
-      - mysql:/var/lib/mysql
-    ports:
-      - 3306:3306
+    links:
+      - mysql
+    restart: always
+    ulimits:
+      stack: -1
     environment:
-      - MYSQL_ALLOW_EMPTY_PASSWORD=true
+      - CRON_INTERVAL_SEC=60
+      - SMTP_MAILHUB=smtp.yandex.ru:465
+      - SMTP_USER=server@pdd-host.ru
+      - SMTP_PASS=password
+      - SMTP_REWRITE_DOMAIN=pdd-host.ru
+      - SMTP_HOSTNAME=www.host.ru
+  mysql:
+    build: ./mysql
+    volumes:
+      - mysql_data:/var/lib/mysql
+    environment:
       - MYSQL_USER=bitrix
-      - MYSQL_PASSWORD=bitrix
+      - MYSQL_PASSWORD=password
       - MYSQL_DATABASE=bitrix
+      - MYSQL_ROOT_PASSWORD=password2
+    restart: always
