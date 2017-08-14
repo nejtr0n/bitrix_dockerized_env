@@ -12,8 +12,8 @@ RUN apt-get update && apt-get install -y \
 RUN docker-php-ext-configure gd --with-freetype-dir=/usr/include/ --with-jpeg-dir=/usr/include/
 RUN docker-php-ext-install -j$(nproc) gd mysqli mcrypt pdo pdo_mysql mbstring tokenizer iconv
 RUN a2enmod rewrite
-RUN usermod -u 1010 www-data
-RUN groupmod -g 1010 www-data
+RUN usermod -u 1000 www-data
+RUN groupmod -g 1000 www-data
 COPY start.sh /usr/local/sbin/start.sh
 COPY php-mail.ini /usr/local/etc/php/conf.d/mail.ini
 COPY bitrix.ini /usr/local/etc/php/conf.d/
