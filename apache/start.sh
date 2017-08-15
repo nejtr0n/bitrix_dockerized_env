@@ -1,10 +1,5 @@
 #!/bin/sh
-if [ ! -f /www/index.php ]; then
-    cp /usr/local/restore.php /www
-    cp /usr/local/bitrixsetup.php /www
-    rm -f /www/empty_file_to_www_folder.txt
-fi
-chown -R www-data:www-data /www
+chown -R www-data:www-data /var/www/html
 # prepare SSMTP
 envsubst < /etc/ssmtp/revaliases.tmpl > /etc/ssmtp/revaliases
 envsubst < /etc/ssmtp/ssmtp.conf.tmpl > /etc/ssmtp/ssmtp.conf

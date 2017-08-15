@@ -17,8 +17,6 @@ RUN groupmod -g 1000 www-data
 COPY start.sh /usr/local/sbin/start.sh
 COPY php-mail.ini /usr/local/etc/php/conf.d/mail.ini
 COPY bitrix.ini /usr/local/etc/php/conf.d/
-COPY bitrixsetup.php /usr/local/bitrixsetup.php
-COPY restore.php /usr/local/restore.php
 COPY date-timezone.conf /etc/apache2/conf-enabled/date-timezone.conf
 COPY encoding.conf /etc/apache2/conf-enabled/encoding.conf
 COPY servername.conf.tmpl /etc/apache2/conf-enabled/servername.conf.tmpl
