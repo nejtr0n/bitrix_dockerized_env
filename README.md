@@ -20,9 +20,9 @@
 
 затем выполнить
 
-`echo $UID`
+`id -u ; id -g`
 
-Если UID данного пользователя не равен 1000, то в apache/Dockerfile заменить 1000 на UID данного пользователя (в строках)
+Если UID и GID данного пользователя не равны 1000:1000, то в apache/Dockerfile заменить 1000 на UID и GID данного пользователя (в строках 15 и 16)
 
 `docker-compose build && docker-compose up -d`
 
