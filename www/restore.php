@@ -3,12 +3,17 @@ if (ini_get('short_open_tag') == 0 && strtoupper(ini_get('short_open_tag')) != '
 	die('Error: short_open_tag parameter must be turned on in php.ini');
 ?><?
 error_reporting(E_ALL & ~E_NOTICE & ~E_STRICT);
+$debug = file_exists(dirname(__FILE__).'/restore.debug');
+
+define('IP_LIMIT_DEFAULT', '#IP'.'_LIMIT_PLACEHOLDER#');
+define('IP_LIMIT', '#IP_LIMIT_PLACEHOLDER#');
+define('INIT_TIMESTAMP', '#INIT_TIMESTAMP#');
 
 if (getenv('BITRIX_VA_VER'))
 	define('VMBITRIX', 'defined');
 
 if (version_compare(phpversion(),'5.3.0','<'))
-	die('Error: PHP5.3 is required');
+	die('Error: PHP version 5.3 or higher is required');
 
 if(realpath(dirname(__FILE__)) != realpath($_SERVER['DOCUMENT_ROOT']))
 	die('Error: this script must be started from Web Server\'s DOCUMENT ROOT');
@@ -22,7 +27,6 @@ if(!defined("START_EXEC_TIME"))
 	define("START_EXEC_TIME", microtime(true));
 
 define("STEP_TIME", defined('VMBITRIX') ? 30 : 15);
-# define("DELAY", defined('VMBITRIX') ? 0 : 3); // reserved
 # xdebug_start_trace();
 define('RESTORE_FILE_LIST', $_SERVER['DOCUMENT_ROOT'].'/bitrix/tmp/restore.file_list.php');
 define('RESTORE_FILE_DIR', $_SERVER['DOCUMENT_ROOT'].'/bitrix/tmp/restore.removed');
@@ -58,8 +62,6 @@ if (!function_exists('htmlspecialcharsbx'))
 }
 
 
-# http://bugs.php.net/bug.php?id=48886 - We have 2Gb file limit on Linux
-
 #@set_time_limit(0);
 ob_start();
 
@@ -69,126 +71,126 @@ elseif (@preg_match('#de#i',$_SERVER['HTTP_ACCEPT_LANGUAGE']))
 	$lang = 'de';
 if ($_REQUEST['lang'])
 	$lang = $_REQUEST['lang'];
-if (!in_array($lang,array('ru','en')))
+if (!in_array($lang,array('ru','en','de')))
 	$lang = 'en';
 define("LANG", $lang);
-if (LANG=='ru' && !headers_sent())
-	header("Content-type:text/html; charset=windows-1251");
+if (!headers_sent())
+	header("Content-type:text/html; charset=utf-8");
 
 $dbconn = $_SERVER['DOCUMENT_ROOT']."/bitrix/php_interface/dbconn.php";
 
 $arc_name = $_REQUEST["arc_name"];
 $mArr_ru =  array(
-			"WINDOW_TITLE" => "Восстановление из резервной копии",
-			"BACK" => "Назад",
+			"WINDOW_TITLE" => "Р’РѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёРµ РёР· СЂРµР·РµСЂРІРЅРѕР№ РєРѕРїРёРё",
 			"BEGIN" => "
 			<p>
 			<ul>
-			<li>Перейдите в административную панель своего сайта на страницу <b>Настройки &gt; Инструменты &gt; Резервное копирование</b>
-			<li>Создайте полную резервную копию, которая будет включать <b>публичную часть</b>, <b>ядро</b> и <b>базу данных</b>
+			<li>РџРµСЂРµР№РґРёС‚Рµ РІ Р°РґРјРёРЅРёСЃС‚СЂР°С‚РёРІРЅСѓСЋ РїР°РЅРµР»СЊ СЃРІРѕРµРіРѕ СЃР°Р№С‚Р° РЅР° СЃС‚СЂР°РЅРёС†Сѓ <b>РќР°СЃС‚СЂРѕР№РєРё &gt; РРЅСЃС‚СЂСѓРјРµРЅС‚С‹ &gt; Р РµР·РµСЂРІРЅРѕРµ РєРѕРїРёСЂРѕРІР°РЅРёРµ</b>
+			<li>РЎРѕР·РґР°Р№С‚Рµ РїРѕР»РЅСѓСЋ СЂРµР·РµСЂРІРЅСѓСЋ РєРѕРїРёСЋ, РєРѕС‚РѕСЂР°СЏ Р±СѓРґРµС‚ РІРєР»СЋС‡Р°С‚СЊ <b>РїСѓР±Р»РёС‡РЅСѓСЋ С‡Р°СЃС‚СЊ</b>, <b>СЏРґСЂРѕ</b> Рё <b>Р±Р°Р·Сѓ РґР°РЅРЅС‹С…</b>
 			</ul>
-			<b>Документация:</b> <a href='http://dev.1c-bitrix.ru/learning/course/index.php?COURSE_ID=35&LESSON_ID=2031' target='_blank'>http://dev.1c-bitrix.ru/learning/course/index.php?COURSE_ID=35&LESSON_ID=2031</a>
+			<a href='https://dev.1c-bitrix.ru/~4thxV' target='_blank'>Р”РѕРєСѓРјРµРЅС‚Р°С†РёСЏ</a>
 			</p>
 			",
-			"ARC_DOWN" => "Скачать резервную копию с дальнего сайта",
-			"ARC_DOWN_BITRIXCLOUD" => "Развернуть резервную копию из облака &quot;1С-Битрикс&quot;",
-			"LICENSE_KEY" => "Ваш лицензионный ключ:",
-			"ARC_LOCAL_NAME" => "Имя архива:",
-			"DB_SELECT" => "Выберите дамп БД:",
-			"DB_SETTINGS" => "Параметры подключения к базе данных",
-			"DB_DEF" => "по умолчанию для выделенного сервера или виртуальной машины",
-			"DB_ENV" => "восстановление в &quot;Битрикс: Веб-окружение&quot;",
-			"DB_OTHER" => "установить значения вручную",
-			"DB_SKIP" => "Пропустить восстановление базы",
-			"SKIP" => "Пропустить",
-			"DELETE_FILES" => "Удалить локальную резервную копию и служебные скрипты",
-			"OR" => "ИЛИ",
-			"ARC_DOWN_URL" => "Ссылка на архив:",
-			"TITLE0" => "Подготовка архива",
-			"TITLE1" => "Загрузка резервной копии",
-			"TITLE_PROCESS1" => "Распаковка архива",
-			"FILE_IS_ENC" => "Архив зашифрован, для продолжения распаковки необходимо ввести пароль (с учетом регистра и пробелов): ",
-			"WRONG_PASS" => "Введенный пароль не верен",
-			"ENC_KEY" => "Пароль: ",
-			"TITLE_PROCESS2" => "Выполняется восстановление базы данных",
-			"TITLE2" => "Восстановление базы данных",
-			"SELECT_LANG" => "Выберите язык",
-			"ARC_SKIP" => "Архив уже распакован",
-			"ARC_SKIP_DESC" => "переход к восстановлению базы данных",
-			"ARC_NAME" => "Архив загружен в корневую папку сервера",
-			"ARC_DOWN_PROCESS" => "Загружается:",
-			"ERR_LOAD_FILE_LIST" => "Ошибочный ответ от сервиса 1С-Битрикс",
-			"ARC_LOCAL" => "Загрузить с локального диска",
-			"ARC_LOCAL_WARN" => "Загрузите все части многотомного архива",
-			"ERR_NO_ARC" => "Не выбран архив для распаковки!",
-			"ERR_NO_PARTS" => "Доступны не все части многотомного архива.<br>Общее число частей: ",
-			"BUT_TEXT1" => "Далее",
-			"BUT_TEXT_BACK" => "Назад",
-			"DUMP_RETRY" => "Попробовать снова",
-			"DUMP_NAME" => "Файл резервной копии базы:",
-			"USER_NAME" => "Имя пользователя",
-			"USER_PASS" => "Пароль",
-			"SEARCHING_UNUSED" => "Поиск посторонних файлов в ядре...",
-			"BASE_NAME" => "Имя базы данных",
-			"BASE_HOST" => "Сервер баз данных",
-			"BASE_RESTORE" => "Восстановить",
-			"ERR_NO_DUMP" => "Не выбран архив базы данных для восстановления!",
-			"ERR_EXTRACT" => "Ошибка",
-			"ERR_MSG" => "Ошибка!",
-			"LICENSE_NOT_FOUND" => "Лицензионный ключ не найден",
-			"SELECT_ARC" => "Выберите архив",
-			"CNT_PARTS" => "частей",
-			"ARC_LIST_EMPTY" => "Нет резервных копий, связанных с этим ключом",
-			"ERR_UNKNOWN" => "Неизвестный ответ сервера",
-			"ERR_UPLOAD" => "Не удалось загрузить файл на сервер",
-			"ERR_DUMP_RESTORE" => "Ошибка восстановления базы данных",
-			"ERR_DB_CONNECT" => "Ошибка соединения с базой данных",
-			"ERR_CREATE_DB" => "Ошибка создания базы",
-			"ERR_TAR_TAR" => "Присутствуют файлы с расширением tar.tar. Вместо них должны быть архивы с номерами: tar.1, tar.2 и т.д.",
-			"FINISH" => "Операция выполнена успешно",
-			"FINISH_MSG" => "Операция восстановления системы завершена.",
-			"FINISH_BTN" => "Перейти на сайт",
-			"EXTRACT_FINISH_TITLE" => "Распаковка архива",
-			"EXTRACT_FINISH_MSG" => "Распаковка архива завершена.",
-			"BASE_CREATE_DB" => "Создать базу данных если не существует",
-			"BASE_CLOUDS" => "Файлы из облачных хранилищ:",
-			"BASE_CLOUDS_Y" => "сохранить локально",
-			"BASE_CLOUDS_N" => "оставить в облаке",
-			"FINISH_ERR_DELL" => "Не удалось удалить все временные файлы! Обязательно удалите их вручную.",
-			"FINISH_ERR_DELL_TITLE" => "Ошибка удаления файлов!",
-			"NO_READ_PERMS" => "Нет прав на чтение корневой папки сайта",
-			"UTF8_ERROR1" => "Сайт работал в кодировке UTF-8. Конфигурация сервера не соответствует требованиям.<br>Для продолжения установите настройки PHP: mbstring.func_overload=2 и mbstring.internal_encoding=UTF-8.",
-			"UTF8_ERROR2" => "Сайт работал в однобайтовой кодировке, а конфигурация сервера рассчитана на кодировку UTF-8.<br>Для продолжения установите настройки PHP: mbstring.func_overload=0 или mbstring.internal_encoding=ISO-8859-1.",
-			"DOC_ROOT_WARN" => "Во избежание проблем с доступом был переписан путь к корню сайта в настройках сайтов. Проверьте настройки сайтов.",
-			"CDN_WARN" => "Ускорение CDN было отключено т.к. текущий домен не соответствует домену из настроек CDN.",
-			"HOSTS_WARN" => "Было отключено ограничение по доменам в модуле проактивной защиты т.к. текущий домен попадает под ограничения.",
-			"WARN_CLEARED" => "При распаковке ядра продукта в папке /bitrix/modules были обнаружены файлы, которых не было в архиве. Эти файлы перенесены в /bitrix/tmp/restore.removed",
-			"WARN_SITES" => "Вы распаковали многосайтовый архив, файлы дополнительных сайтов следует скопировать вручную из папки /bitrix/backup/sites",
-			"WARNING" => "Внимание!",
-			"DBCONN_WARN" => "Данные подключения взяты из dbconn.php. Если их не изменить, будет переписана база данных текущего сайта.",
-			"HTACCESS_RENAMED_WARN" => "Файл .htaccess из архива был сохранен в корне сайта под именем .htaccess.restore, т.к. он может содержать директивы, недопустимые на данном сервере.",
-			"HTACCESS_WARN" => "Файл .htaccess из архива был сохранен в корне сайта под именем .htaccess.restore, т.к. он может содержать директивы, недопустимые на данном сервере. В корне сайта создан .htaccess по умолчанию. Измените его вручную через FTP.",
-			"HTACCESS_ERR_WARN" => "Файл .htaccess из архива был сохранен в корне сайта под именем .htaccess.restore, т.к. он может содержать директивы, недопустимые на данном сервере. <br> Не удалось создать корне сайта .htaccess по умолчанию. Переименуйте файл .htaccess.restore в .htaccess через FTP.",
-			"ERR_CANT_DECODE" => "Невозможно восстановить архив т.к. он содержит файлы, имена которых нужно перекодировать, а модуль mbstring недоступен.",
-			"ERR_CANT_DETECT_ENC" => "Невозможно восстановить архив т.к. он содержит файлы с именами в неизвестной кодировке:",
-			'TAR_ERR_FILE_OPEN' => 'Не удалось открыть файл: ',
-			"ARC_DOWN_OK" => "Все части архива загружены",
+			"ARC_DOWN" => "РЎРєР°С‡Р°С‚СЊ СЂРµР·РµСЂРІРЅСѓСЋ РєРѕРїРёСЋ СЃ РґР°Р»СЊРЅРµРіРѕ СЃР°Р№С‚Р°",
+			"ARC_DOWN_BITRIXCLOUD" => "Р Р°Р·РІРµСЂРЅСѓС‚СЊ СЂРµР·РµСЂРІРЅСѓСЋ РєРѕРїРёСЋ РёР· РѕР±Р»Р°РєР° &quot;1РЎ-Р‘РёС‚СЂРёРєСЃ&quot;",
+			"BITRIXCLOUD_KEYS" => "РћР±РЅРѕРІР»РµРЅРёРµ РєР»СЋС‡РµР№ РґРѕСЃС‚СѓРїР° Рє С„Р°Р№Р»Р°Рј РІ РѕР±Р»Р°РєРµ",
+			"LICENSE_KEY" => "Р’Р°С€ Р»РёС†РµРЅР·РёРѕРЅРЅС‹Р№ РєР»СЋС‡:",
+			"ARC_LOCAL_NAME" => "РРјСЏ Р°СЂС…РёРІР°:",
+			"DB_SELECT" => "Р’С‹Р±РµСЂРёС‚Рµ РґР°РјРї Р‘Р”:",
+			"DB_SETTINGS" => "РџР°СЂР°РјРµС‚СЂС‹ РїРѕРґРєР»СЋС‡РµРЅРёСЏ Рє Р±Р°Р·Рµ РґР°РЅРЅС‹С…",
+			"DB_DEF" => "РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ РґР»СЏ РІС‹РґРµР»РµРЅРЅРѕРіРѕ СЃРµСЂРІРµСЂР° РёР»Рё РІРёСЂС‚СѓР°Р»СЊРЅРѕР№ РјР°С€РёРЅС‹",
+			"DB_ENV" => "РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёРµ РІ &quot;Р‘РёС‚СЂРёРєСЃ: Р’РµР±-РѕРєСЂСѓР¶РµРЅРёРµ&quot;",
+			"DB_OTHER" => "СѓСЃС‚Р°РЅРѕРІРёС‚СЊ Р·РЅР°С‡РµРЅРёСЏ РІСЂСѓС‡РЅСѓСЋ",
+			"DB_SKIP" => "РџСЂРѕРїСѓСЃС‚РёС‚СЊ РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёРµ Р±Р°Р·С‹",
+			"SKIP" => "РџСЂРѕРїСѓСЃС‚РёС‚СЊ",
+			"DELETE_FILES" => "РЈРґР°Р»РёС‚СЊ Р»РѕРєР°Р»СЊРЅСѓСЋ СЂРµР·РµСЂРІРЅСѓСЋ РєРѕРїРёСЋ Рё СЃР»СѓР¶РµР±РЅС‹Рµ СЃРєСЂРёРїС‚С‹",
+			"OR" => "РР›Р",
+			"ARC_DOWN_URL" => "РЎСЃС‹Р»РєР° РЅР° Р°СЂС…РёРІ:",
+			"TITLE0" => "РџРѕРґРіРѕС‚РѕРІРєР° Р°СЂС…РёРІР°",
+			"TITLE1" => "Р—Р°РіСЂСѓР·РєР° СЂРµР·РµСЂРІРЅРѕР№ РєРѕРїРёРё",
+			"TITLE_PROCESS1" => "Р Р°СЃРїР°РєРѕРІРєР° Р°СЂС…РёРІР°",
+			"FILE_IS_ENC" => "РђСЂС…РёРІ Р·Р°С€РёС„СЂРѕРІР°РЅ, РґР»СЏ РїСЂРѕРґРѕР»Р¶РµРЅРёСЏ СЂР°СЃРїР°РєРѕРІРєРё РЅРµРѕР±С…РѕРґРёРјРѕ РІРІРµСЃС‚Рё РїР°СЂРѕР»СЊ (СЃ СѓС‡РµС‚РѕРј СЂРµРіРёСЃС‚СЂР° Рё РїСЂРѕР±РµР»РѕРІ): ",
+			"WRONG_PASS" => "Р’РІРµРґРµРЅРЅС‹Р№ РїР°СЂРѕР»СЊ РЅРµРІРµСЂРµРЅ",
+			"ENC_KEY" => "РџР°СЂРѕР»СЊ: ",
+			"TITLE_PROCESS2" => "Р’С‹РїРѕР»РЅСЏРµС‚СЃСЏ РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёРµ Р±Р°Р·С‹ РґР°РЅРЅС‹С…",
+			"TITLE2" => "Р’РѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёРµ Р±Р°Р·С‹ РґР°РЅРЅС‹С…",
+			"SELECT_LANG" => "Р’С‹Р±РµСЂРёС‚Рµ СЏР·С‹Рє",
+			"ARC_SKIP" => "РђСЂС…РёРІ СѓР¶Рµ СЂР°СЃРїР°РєРѕРІР°РЅ",
+			"ARC_SKIP_DESC" => "РїРµСЂРµС…РѕРґ Рє РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёСЋ Р±Р°Р·С‹ РґР°РЅРЅС‹С…",
+			"ARC_NAME" => "РђСЂС…РёРІ Р·Р°РіСЂСѓР¶РµРЅ РІ РєРѕСЂРЅРµРІСѓСЋ РїР°РїРєСѓ СЃРµСЂРІРµСЂР°",
+			"ARC_DOWN_PROCESS" => "Р—Р°РіСЂСѓР¶Р°РµС‚СЃСЏ:",
+			"ERR_LOAD_FILE_LIST" => "РћС€РёР±РѕС‡РЅС‹Р№ РѕС‚РІРµС‚ РѕС‚ СЃРµСЂРІРёСЃР° 1РЎ-Р‘РёС‚СЂРёРєСЃ",
+			"ARC_LOCAL" => "Р—Р°РіСЂСѓР·РёС‚СЊ СЃ Р»РѕРєР°Р»СЊРЅРѕРіРѕ РґРёСЃРєР°",
+			"ARC_LOCAL_WARN" => "Р—Р°РіСЂСѓР·РёС‚Рµ РІСЃРµ С‡Р°СЃС‚Рё РјРЅРѕРіРѕС‚РѕРјРЅРѕРіРѕ Р°СЂС…РёРІР°",
+			"ERR_NO_ARC" => "РќРµ РІС‹Р±СЂР°РЅ Р°СЂС…РёРІ РґР»СЏ СЂР°СЃРїР°РєРѕРІРєРё!",
+			"ERR_NO_PARTS" => "Р”РѕСЃС‚СѓРїРЅС‹ РЅРµ РІСЃРµ С‡Р°СЃС‚Рё РјРЅРѕРіРѕС‚РѕРјРЅРѕРіРѕ Р°СЂС…РёРІР°.<br>РћР±С‰РµРµ С‡РёСЃР»Рѕ С‡Р°СЃС‚РµР№: ",
+			"BUT_TEXT1" => "Р”Р°Р»РµРµ",
+			"BUT_TEXT_BACK" => "РќР°Р·Р°Рґ",
+			"DUMP_RETRY" => "РџРѕРїСЂРѕР±РѕРІР°С‚СЊ СЃРЅРѕРІР°",
+			"DUMP_NAME" => "Р¤Р°Р№Р» СЂРµР·РµСЂРІРЅРѕР№ РєРѕРїРёРё Р±Р°Р·С‹:",
+			"USER_NAME" => "РРјСЏ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ",
+			"USER_PASS" => "РџР°СЂРѕР»СЊ",
+			"SEARCHING_UNUSED" => "РџРѕРёСЃРє РїРѕСЃС‚РѕСЂРѕРЅРЅРёС… С„Р°Р№Р»РѕРІ РІ СЏРґСЂРµ...",
+			"BASE_NAME" => "РРјСЏ Р±Р°Р·С‹ РґР°РЅРЅС‹С…",
+			"BASE_HOST" => "РЎРµСЂРІРµСЂ Р±Р°Р· РґР°РЅРЅС‹С…",
+			"BASE_RESTORE" => "Р’РѕСЃСЃС‚Р°РЅРѕРІРёС‚СЊ",
+			"ERR_NO_DUMP" => "РќРµ РІС‹Р±СЂР°РЅ Р°СЂС…РёРІ Р±Р°Р·С‹ РґР°РЅРЅС‹С… РґР»СЏ РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёСЏ!",
+			"ERR_EXTRACT" => "РћС€РёР±РєР°",
+			"ERR_MSG" => "РћС€РёР±РєР°!",
+			"LICENSE_NOT_FOUND" => "Р›РёС†РµРЅР·РёРѕРЅРЅС‹Р№ РєР»СЋС‡ РЅРµ РЅР°Р№РґРµРЅ",
+			"SELECT_ARC" => "Р’С‹Р±РµСЂРёС‚Рµ Р°СЂС…РёРІ",
+			"CNT_PARTS" => "С‡Р°СЃС‚РµР№",
+			"ARC_LIST_EMPTY" => "РќРµС‚ СЂРµР·РµСЂРІРЅС‹С… РєРѕРїРёР№, СЃРІСЏР·Р°РЅРЅС‹С… СЃ СЌС‚РёРј РєР»СЋС‡РѕРј",
+			"ERR_UNKNOWN" => "РќРµРёР·РІРµСЃС‚РЅС‹Р№ РѕС‚РІРµС‚ СЃРµСЂРІРµСЂР°",
+			"ERR_UPLOAD" => "РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ С„Р°Р№Р» РЅР° СЃРµСЂРІРµСЂ",
+			"ERR_DUMP_RESTORE" => "РћС€РёР±РєР° РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёСЏ Р±Р°Р·С‹ РґР°РЅРЅС‹С…",
+			"ERR_DB_CONNECT" => "РћС€РёР±РєР° СЃРѕРµРґРёРЅРµРЅРёСЏ СЃ Р±Р°Р·РѕР№ РґР°РЅРЅС‹С…",
+			"ERR_CREATE_DB" => "РћС€РёР±РєР° СЃРѕР·РґР°РЅРёСЏ Р±Р°Р·С‹",
+			"ERR_TAR_TAR" => "РџСЂРёСЃСѓС‚СЃС‚РІСѓСЋС‚ С„Р°Р№Р»С‹ СЃ СЂР°СЃС€РёСЂРµРЅРёРµРј tar.tar. Р’РјРµСЃС‚Рѕ РЅРёС… РґРѕР»Р¶РЅС‹ Р±С‹С‚СЊ Р°СЂС…РёРІС‹ СЃ РЅРѕРјРµСЂР°РјРё: tar.1, tar.2 Рё С‚.Рґ.",
+			"FINISH" => "РћРїРµСЂР°С†РёСЏ РІС‹РїРѕР»РЅРµРЅР° СѓСЃРїРµС€РЅРѕ",
+			"FINISH_MSG" => "РћРїРµСЂР°С†РёСЏ РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёСЏ СЃРёСЃС‚РµРјС‹ Р·Р°РІРµСЂС€РµРЅР°.",
+			"FINISH_BTN" => "РџРµСЂРµР№С‚Рё РЅР° СЃР°Р№С‚",
+			"EXTRACT_FINISH_TITLE" => "Р Р°СЃРїР°РєРѕРІРєР° Р°СЂС…РёРІР°",
+			"EXTRACT_FINISH_MSG" => "Р Р°СЃРїР°РєРѕРІРєР° Р°СЂС…РёРІР° Р·Р°РІРµСЂС€РµРЅР°.",
+			"BASE_CREATE_DB" => "РЎРѕР·РґР°С‚СЊ Р±Р°Р·Сѓ РґР°РЅРЅС‹С… РµСЃР»Рё РЅРµ СЃСѓС‰РµСЃС‚РІСѓРµС‚",
+			"BASE_CLOUDS" => "Р¤Р°Р№Р»С‹ РёР· РѕР±Р»Р°С‡РЅС‹С… С…СЂР°РЅРёР»РёС‰:",
+			"BASE_CLOUDS_Y" => "СЃРѕС…СЂР°РЅРёС‚СЊ Р»РѕРєР°Р»СЊРЅРѕ",
+			"BASE_CLOUDS_N" => "РѕСЃС‚Р°РІРёС‚СЊ РІ РѕР±Р»Р°РєРµ",
+			"FINISH_ERR_DELL" => "РќРµ СѓРґР°Р»РѕСЃСЊ СѓРґР°Р»РёС‚СЊ РІСЃРµ РІСЂРµРјРµРЅРЅС‹Рµ С„Р°Р№Р»С‹! РћР±СЏР·Р°С‚РµР»СЊРЅРѕ СѓРґР°Р»РёС‚Рµ РёС… РІСЂСѓС‡РЅСѓСЋ.",
+			"FINISH_ERR_DELL_TITLE" => "РћС€РёР±РєР° СѓРґР°Р»РµРЅРёСЏ С„Р°Р№Р»РѕРІ!",
+			"NO_READ_PERMS" => "РќРµС‚ РїСЂР°РІ РЅР° С‡С‚РµРЅРёРµ РєРѕСЂРЅРµРІРѕР№ РїР°РїРєРё СЃР°Р№С‚Р°",
+			"UTF8_ERROR1" => "РЎР°Р№С‚ СЂР°Р±РѕС‚Р°Р» РІ РєРѕРґРёСЂРѕРІРєРµ UTF-8. РљРѕРЅС„РёРіСѓСЂР°С†РёСЏ СЃРµСЂРІРµСЂР° РЅРµ СЃРѕРѕС‚РІРµС‚СЃС‚РІСѓРµС‚ С‚СЂРµР±РѕРІР°РЅРёСЏРј.<br>Р”Р»СЏ РїСЂРѕРґРѕР»Р¶РµРЅРёСЏ СѓСЃС‚Р°РЅРѕРІРёС‚Рµ РЅР°СЃС‚СЂРѕР№РєРё PHP: mbstring.func_overload=2 Рё mbstring.internal_encoding=UTF-8.",
+			"UTF8_ERROR2" => "РЎР°Р№С‚ СЂР°Р±РѕС‚Р°Р» РІ РѕРґРЅРѕР±Р°Р№С‚РѕРІРѕР№ РєРѕРґРёСЂРѕРІРєРµ, Р° РєРѕРЅС„РёРіСѓСЂР°С†РёСЏ СЃРµСЂРІРµСЂР° СЂР°СЃСЃС‡РёС‚Р°РЅР° РЅР° РєРѕРґРёСЂРѕРІРєСѓ UTF-8.<br>Р”Р»СЏ РїСЂРѕРґРѕР»Р¶РµРЅРёСЏ СѓСЃС‚Р°РЅРѕРІРёС‚Рµ РЅР°СЃС‚СЂРѕР№РєРё PHP: mbstring.func_overload=0 РёР»Рё mbstring.internal_encoding=ISO-8859-1.",
+			"DOC_ROOT_WARN" => "Р’Рѕ РёР·Р±РµР¶Р°РЅРёРµ РїСЂРѕР±Р»РµРј СЃ РґРѕСЃС‚СѓРїРѕРј Р±С‹Р» РїРµСЂРµРїРёСЃР°РЅ РїСѓС‚СЊ Рє РєРѕСЂРЅСЋ СЃР°Р№С‚Р° РІ РЅР°СЃС‚СЂРѕР№РєР°С… СЃР°Р№С‚РѕРІ. РџСЂРѕРІРµСЂСЊС‚Рµ РЅР°СЃС‚СЂРѕР№РєРё СЃР°Р№С‚РѕРІ.",
+			"CDN_WARN" => "РЈСЃРєРѕСЂРµРЅРёРµ CDN Р±С‹Р»Рѕ РѕС‚РєР»СЋС‡РµРЅРѕ С‚.Рє. С‚РµРєСѓС‰РёР№ РґРѕРјРµРЅ РЅРµ СЃРѕРѕС‚РІРµС‚СЃС‚РІСѓРµС‚ РґРѕРјРµРЅСѓ РёР· РЅР°СЃС‚СЂРѕРµРє CDN.",
+			"HOSTS_WARN" => "Р‘С‹Р»Рѕ РѕС‚РєР»СЋС‡РµРЅРѕ РѕРіСЂР°РЅРёС‡РµРЅРёРµ РїРѕ РґРѕРјРµРЅР°Рј РІ РјРѕРґСѓР»Рµ РїСЂРѕР°РєС‚РёРІРЅРѕР№ Р·Р°С‰РёС‚С‹ С‚.Рє. С‚РµРєСѓС‰РёР№ РґРѕРјРµРЅ РїРѕРїР°РґР°РµС‚ РїРѕРґ РѕРіСЂР°РЅРёС‡РµРЅРёСЏ.",
+			"WARN_CLEARED" => "РџСЂРё СЂР°СЃРїР°РєРѕРІРєРµ СЏРґСЂР° Р±С‹Р»Рё РѕР±РЅР°СЂСѓР¶РµРЅС‹ С„Р°Р№Р»С‹, РєРѕС‚РѕСЂС‹С… РЅРµ Р±С‹Р»Рѕ РІ Р°СЂС…РёРІРµ. Р­С‚Рё С„Р°Р№Р»С‹ РїРµСЂРµРЅРµСЃРµРЅС‹ РІ /bitrix/tmp/restore.removed",
+			"WARN_SITES" => "Р’С‹ СЂР°СЃРїР°РєРѕРІР°Р»Рё РјРЅРѕРіРѕСЃР°Р№С‚РѕРІС‹Р№ Р°СЂС…РёРІ, С„Р°Р№Р»С‹ РґРѕРїРѕР»РЅРёС‚РµР»СЊРЅС‹С… СЃР°Р№С‚РѕРІ СЃР»РµРґСѓРµС‚ СЃРєРѕРїРёСЂРѕРІР°С‚СЊ РІСЂСѓС‡РЅСѓСЋ РёР· РїР°РїРєРё /bitrix/backup/sites",
+			"WARNING" => "Р’РЅРёРјР°РЅРёРµ!",
+			"DBCONN_WARN" => "Р”Р°РЅРЅС‹Рµ РїРѕРґРєР»СЋС‡РµРЅРёСЏ РІР·СЏС‚С‹ РёР· dbconn.php. Р•СЃР»Рё РёС… РЅРµ РёР·РјРµРЅРёС‚СЊ, Р±СѓРґРµС‚ РїРµСЂРµРїРёСЃР°РЅР° Р±Р°Р·Р° РґР°РЅРЅС‹С… С‚РµРєСѓС‰РµРіРѕ СЃР°Р№С‚Р°.",
+			"HTACCESS_RENAMED_WARN" => "Р¤Р°Р№Р» .htaccess РёР· Р°СЂС…РёРІР° Р±С‹Р» СЃРѕС…СЂР°РЅРµРЅ РІ РєРѕСЂРЅРµ СЃР°Р№С‚Р° РїРѕРґ РёРјРµРЅРµРј .htaccess.restore, С‚.Рє. РѕРЅ РјРѕР¶РµС‚ СЃРѕРґРµСЂР¶Р°С‚СЊ РґРёСЂРµРєС‚РёРІС‹, РЅРµРґРѕРїСѓСЃС‚РёРјС‹Рµ РЅР° РґР°РЅРЅРѕРј СЃРµСЂРІРµСЂРµ.",
+			"HTACCESS_WARN" => "Р¤Р°Р№Р» .htaccess РёР· Р°СЂС…РёРІР° Р±С‹Р» СЃРѕС…СЂР°РЅРµРЅ РІ РєРѕСЂРЅРµ СЃР°Р№С‚Р° РїРѕРґ РёРјРµРЅРµРј .htaccess.restore, С‚.Рє. РѕРЅ РјРѕР¶РµС‚ СЃРѕРґРµСЂР¶Р°С‚СЊ РґРёСЂРµРєС‚РёРІС‹, РЅРµРґРѕРїСѓСЃС‚РёРјС‹Рµ РЅР° РґР°РЅРЅРѕРј СЃРµСЂРІРµСЂРµ. Р’ РєРѕСЂРЅРµ СЃР°Р№С‚Р° СЃРѕР·РґР°РЅ .htaccess РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ. РР·РјРµРЅРёС‚Рµ РµРіРѕ РІСЂСѓС‡РЅСѓСЋ С‡РµСЂРµР· FTP.",
+			"HTACCESS_ERR_WARN" => "Р¤Р°Р№Р» .htaccess РёР· Р°СЂС…РёРІР° Р±С‹Р» СЃРѕС…СЂР°РЅРµРЅ РІ РєРѕСЂРЅРµ СЃР°Р№С‚Р° РїРѕРґ РёРјРµРЅРµРј .htaccess.restore, С‚.Рє. РѕРЅ РјРѕР¶РµС‚ СЃРѕРґРµСЂР¶Р°С‚СЊ РґРёСЂРµРєС‚РёРІС‹, РЅРµРґРѕРїСѓСЃС‚РёРјС‹Рµ РЅР° РґР°РЅРЅРѕРј СЃРµСЂРІРµСЂРµ. <br> РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕР·РґР°С‚СЊ РєРѕСЂРЅРµ СЃР°Р№С‚Р° .htaccess РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ. РџРµСЂРµРёРјРµРЅСѓР№С‚Рµ С„Р°Р№Р» .htaccess.restore РІ .htaccess С‡РµСЂРµР· FTP.",
+			"ERR_CANT_DECODE" => "РќРµРІРѕР·РјРѕР¶РЅРѕ РІРѕСЃСЃС‚Р°РЅРѕРІРёС‚СЊ Р°СЂС…РёРІ С‚.Рє. РѕРЅ СЃРѕРґРµСЂР¶РёС‚ С„Р°Р№Р»С‹, РёРјРµРЅР° РєРѕС‚РѕСЂС‹С… РЅСѓР¶РЅРѕ РїРµСЂРµРєРѕРґРёСЂРѕРІР°С‚СЊ, Р° РјРѕРґСѓР»СЊ mbstring РЅРµРґРѕСЃС‚СѓРїРµРЅ.",
+			"ERR_CANT_DETECT_ENC" => "РќРµРІРѕР·РјРѕР¶РЅРѕ РІРѕСЃСЃС‚Р°РЅРѕРІРёС‚СЊ Р°СЂС…РёРІ С‚.Рє. РѕРЅ СЃРѕРґРµСЂР¶РёС‚ С„Р°Р№Р»С‹ СЃ РёРјРµРЅР°РјРё РІ РЅРµРёР·РІРµСЃС‚РЅРѕР№ РєРѕРґРёСЂРѕРІРєРµ:",
+			'TAR_ERR_FILE_OPEN' => 'РќРµ СѓРґР°Р»РѕСЃСЊ РѕС‚РєСЂС‹С‚СЊ С„Р°Р№Р»: ',
+			"ARC_DOWN_OK" => "Р’СЃРµ С‡Р°СЃС‚Рё Р°СЂС…РёРІР° Р·Р°РіСЂСѓР¶РµРЅС‹",
 		);
 
 $mArr_en = array(
 			"WINDOW_TITLE" => "Restoring",
-			"BACK" => "Back",
 			"BEGIN" => "
 			<p>
 			<ul>
 			<li>Open Control Panel section of your old site and select <b>Settings &gt; Tools &gt; Backup</b>
 			<li>Create full archive which contains <b>public site files</b>, <b>kernel files</b> and <b>database dump</b>
 			</ul>
-			<b>Documentation:</b> <a href='http://www.bitrixsoft.com/support/training/course/lesson.php?COURSE_ID=12&ID=441' target='_blank'>learning course</a>
+			<b>Documentation:</b> <a href='https://training.bitrix24.com/support/training/course/?COURSE_ID=12&LESSON_ID=5913&LESSON_PATH=3884.5489.5913' target='_blank'>learning course</a>
 			</p>
 			",
 			"ARC_DOWN" => "Download from remote server",
 			"ARC_DOWN_BITRIXCLOUD" => "Restore the backup from the Bitrix Cloud",
+			"BITRIXCLOUD_KEYS" => "Refreshing Bitrix Cloud access keys",
 			"LICENSE_KEY" => "Your license key:",
 			"ARC_LOCAL_NAME" => "Archive name:",
 			"DB_SELECT" => "Select Database Dump:",
@@ -259,7 +261,7 @@ $mArr_en = array(
 			"DOC_ROOT_WARN" => "To prevent access problems the document root has been cleared in the site settings.",
 			"CDN_WARN" => "CDN Web Accelerator has been disabled because current domain differs from the one stored in CDN settings.",
 			"HOSTS_WARN" => "Domain restriction has beed disabled (security module) because current domain doesn't correspond settings.",
-			"WARN_CLEARED" => "Some files were found in /bitrix/modules which don't present in the backup. They were moved to /bitrix/tmp/restore.removed",
+			"WARN_CLEARED" => "Some files were found in /bitrix which don't present in the backup. They were moved to /bitrix/tmp/restore.removed",
 			"WARN_SITES" => "You have extracted the multisite archive, please copy files of additional sites from /bitrix/backup/sites to an appropriate place",
 			"WARNING" => "Warning!",
 			"DBCONN_WARN" => "The connection settings are read from dbconn.php. If you don't change them, current database will be overwriten.",
@@ -272,49 +274,197 @@ $mArr_en = array(
 			"ARC_DOWN_OK" => "All archive parts have been downloaded",
 		);
 
+$mArr_de = array(
+			"WINDOW_TITLE" => "Wird wiederhergestellt",
+			"BACK" => "ZurГјck",
+			"BEGIN" => "
+			<p>
+			<ul>
+			<li>Г–ffnen Sie den Administrativen Bereich Ihrer alten Website und wГ¤hlen Sie <b>Einstellungen &gt; Tools &gt; Backup</b>
+			<li>Erstellen Sie ein vollstГ¤ndiges Archiv mit <b>Г¶ffentlichen Website-Dateien</b>, <b>Kernel-Dateien</b> und <b>Datenbank-Dump</b>
+			</ul>
+			<b>Dokumentation:</b> <a href='https://training.bitrix24.com/support/training/course/?COURSE_ID=12&LESSON_ID=5913&LESSON_PATH=3884.5489.5913' target='_blank'>Trainingskurs</a>
+			</p>
+			",
+			"ARC_DOWN" => "Von Remote-Server herunterladen",
+			"ARC_DOWN_BITRIXCLOUD" => "Backup aus der Bitrix Cloud wiederherstellen",
+			"BITRIXCLOUD_KEYS" => "Refreshing Bitrix Cloud access keys",
+			"LICENSE_KEY" => "Ihr LizenzschlГјssel:",
+			"ARC_LOCAL_NAME" => "Archivname:",
+			"DB_SELECT" => "Datenbank-Dump auswГ¤hlen:",
+			"DB_SETTINGS" => "Datenbank-Einstellungen",
+			"DB_DEF" => "Standardwerte fГјr Dedicated Server oder Virtuelle Maschine",
+			"DB_ENV" => "in Bitrix Umgebung wiederherstellen",
+			"DB_OTHER" => "benutzerdefinierte Datenbank-Einstellungen",
+			"DB_SKIP" => "Гњberspringen",
+			"SKIP" => "Гњberspringen",
+			"DELETE_FILES" => "Archiv und temporГ¤re Scripts lГ¶schen",
+			"OR" => "ODER",
+			"ARC_DOWN_URL" => "Archiv-URL:",
+			"TITLE0" => "Archiv erstellen",
+			"TITLE1" => "Archiv herunterladen",
+			"TITLE_PROCESS1" => "Archiv wird entpackt",
+			"TITLE_PROCESS2" => "Datenbank wird wiederhergestellt...",
+			"FILE_IS_ENC" => "Archiv ist verschlГјsselt. Passwort eingeben: ",
+			"WRONG_PASS" => "Passwort ist falsch",
+			"ENC_KEY" => "Passwort: ",
+			"TITLE2" => "Datenbank wiederherstellen",
+			"SELECT_LANG" => "Die Sprache auswГ¤hlen",
+			"ARC_SKIP" => "Archiv wurde bereits entpackt",
+			"ARC_SKIP_DESC" => "Wiederherstellung der Datenbank starten",
+			"ARC_NAME" => "Archiv ist im Dokumenten-Root abgespeichert",
+			"ARC_DOWN_PROCESS" => "Wird herunterladen:",
+			"ERR_LOAD_FILE_LIST" => "Falsche Antwort vom Bitrixsoft Server",
+			"ARC_LOCAL" => "Vom lokalen Speicher hochladen",
+			"ARC_LOCAL_WARN" => "Vergessen Sie nicht, alle Teile eines mehrbГ¤ndigen Archivs hochzuladen.",
+			"ERR_NO_ARC" => "Archiv zum Entpacken wurde nicht angegeben.",
+			"ERR_NO_PARTS" => "Einige Teile des mehrbГ¤ndigen Archivs fehlen.<br>Teile gesamt: ",
+			"BUT_TEXT1" => "Fortfahren",
+			"BUT_TEXT_BACK" => "ZurГјck",
+			"DUMP_RETRY" => "Wiederholen",
+			"DUMP_NAME" => "Datei des Datenbank-Dump:",
+			"USER_NAME" => "Name des datenbank-Nutzers",
+			"USER_PASS" => "Passwort",
+			"BASE_NAME" => "Datenbankname",
+			"SEARCHING_UNUSED" => "Ungenutzte Kernel-Dateien werden gesucht...",
+			"BASE_HOST" => "Datenbank-Host",
+			"BASE_RESTORE" => "Wiederherstellen",
+			"ERR_NO_DUMP" => "Datei des Datenbank-Dump ist nicht angegeben.",
+			"ERR_EXTRACT" => "Fehler",
+			"ERR_MSG" => "Fehler!",
+			"LICENSE_NOT_FOUND" => "Lizenz wurde nicht gefunden",
+			"SELECT_ARC" => "Backup auswГ¤hlen",
+			"CNT_PARTS" => "Teile",
+			"ARC_LIST_EMPTY" => "Backup-Liste ist leer fГјr den aktuellen LizenzschlГјssel",
+			"ERR_UNKNOWN" => "Unbekannte Server-Antwort",
+			"ERR_UPLOAD" => "Datei kann nicht hochgeladen werden",
+			"ERR_DUMP_RESTORE" => "Fehler bei Wiederherstellung der Datenbank:",
+			"ERR_DB_CONNECT" => "Fehler bei Verbindung der Datenbank:",
+			"ERR_CREATE_DB" => "Fehler bei Erstellung der Datenbank",
+			"ERR_TAR_TAR" => "Es gibt Dateien mit Erweiterung tar.tar. Es mГјssten tar.1, tar.2 und so weiter sein",
+			"FINISH" => "Erfolgreich abgeschlossen",
+			"FINISH_MSG" => "Wiederherstellung des Systems wurde abgeschlossen.",
+			"FINISH_BTN" => "Website Г¶ffnen",
+			"EXTRACT_FINISH_TITLE" => "Archiv wird entpackt",
+			"EXTRACT_FINISH_MSG" => "Archiv-Entpackung wurde abgeschlossen.",
+			"BASE_CREATE_DB" => "Datenbank erstellen",
+			"BASE_CLOUDS" => "Cloud-Dateien:",
+			"BASE_CLOUDS_Y" => "lokal speichern",
+			"BASE_CLOUDS_N" => "in der Cloud lassen",
+			"FINISH_ERR_DELL" => "LГ¶schen von temporГ¤ren Dateien ist fehlgeschlagen. Sie sollten diese manuell lГ¶schen",
+			"FINISH_ERR_DELL_TITLE" => "Fehler beim LГ¶schen von dateien.",
+			"NO_READ_PERMS" => "Sie haben nicht genГјgend Rechte, um Web-Server Root zu lesen",
+			"UTF8_ERROR1" => "Ihr Server ist fГјr die Codierung UTF-8 nicht konfiguriert. Definieren Sie bitte mbstring.func_overload=2 und mbstring.internal_encoding=UTF-8 um fortzufahren.",
+			"UTF8_ERROR2" => "Ihr Server ist fГјr die Codierung UTF-8 konfiguriert. Definieren Sie bitte mbstring.func_overload=0 oder mbstring.internal_encoding=ISO-8859-1 um fortzufahren.",
+			"DOC_ROOT_WARN" => "Um Probleme mit Zugriffsrechten zu vermeiden, wurde das Dokumenten-Root in den Einstellungen der Website aufgerГ¤umt.",
+			"CDN_WARN" => "CDN Web-Accelerator wurde deaktiviert, weil die aktuelle Domain sich von der unterscheidet, die in den CDN-Einstellungen gespeichrt ist.",
+			"HOSTS_WARN" => "Domain-EinschrГ¤nkung wurde deaktiviert (Sicherheitsmodul), weil die aktuelle Domain den Einstellungen nicht entspricht.",
+			"WARN_CLEARED" => "Einige Dateien wurden in /bitrix gefunden, sie sind in der Backup nicht enthalten. Sie wurden nach /bitrix/tmp/restore.removed verschoben",
+			"WARN_SITES" => "Sie haben das Multisite-Archiv entpackt, kopieren Sie bitte die Dateien zusГ¤tzlicher Websites von /bitrix/backup/sites in einen entsprechenden Ort",
+			"WARNING" => "Warnung!",
+			"DBCONN_WARN" => "Die Verbindungseinstellungen werden von dbconn.php gelesen. Wenn Sie sie nicht Г¤ndern, wird aktuelle Datenbank Гјberschrieben.",
+			"HTACCESS_RENAMED_WARN" => "Die Datei .htaccess wurde unter .htaccess.restore gespeichert, weil sie Anweisungen enthalten kann, die auf diesem Server nicht erlaubt sind.",
+			"HTACCESS_WARN" => "Die Datei .htaccess wurde unter .htaccess.restore gespeichert, weil sie die Anweisungen enthalten kann, die auf diesem Server nicht erlaubt sind. Standarddatei .htaccess wurde im Dokumenten-Root erstellt. Sie sollten sie manuell via FTP aktualisieren.",
+			"HTACCESS_ERR_WARN" => "Die Datei .htaccess wurde unter .htaccess.restore gespeichert, weil sie Anweisungen enthalten kann, die auf diesem Server nicht erlaubt sind. Es gab einen Fehler beim Erstellen der Standarddatei .htaccess. Sie sollten .htaccess.restore in .htaccess via FTP umbenennen.",
+			"ERR_CANT_DECODE" => "UnmГ¶glich fortzufahren, weil das Modul MBString nicht verfГјgbar ist.",
+			"ERR_CANT_DETECT_ENC" => "UnmГ¶glich fortzufahren wegen eines Fehlers in der Erkennung der Codierung des Dateinamen: ",
+			'TAR_ERR_FILE_OPEN' => 'Datei kann nicht geГ¶ffnet werden: ',
+			"ARC_DOWN_OK" => "Alle Archivteile wurden heruntergeladen",
+	);
+
 	$MESS = array();
-	if (LANG=="ru")
+	if (LANG == "ru")
 	{
-		$MESS["LOADER_SUBTITLE1"] = "Загрузка резервной копии";
-		$MESS["LOADER_SUBTITLE1_ERR"] = "Ошибка загрузки";
-		$MESS["STATUS"] = "% выполнено...";
-		$MESS["LOADER_MENU_UNPACK"] = "Распаковка файла";
-		$MESS["LOADER_TITLE_LIST"] = "Выбор файла";
-		$MESS["LOADER_TITLE_LOAD"] = "Загрузка файла на сайт";
-		$MESS["LOADER_TITLE_UNPACK"] = "Распаковка файла";
-		$MESS["LOADER_TITLE_LOG"] = "Отчет по загрузке";
-		$MESS["LOADER_NEW_LOAD"] = "Загрузить";
-		$MESS["LOADER_BACK_2LIST"] = "Вернуться в список файлов";
-		$MESS["LOADER_LOG_ERRORS"] = "Загрузка резервной копии не удалась";
-		$MESS["LOADER_NO_LOG"] = "Log-файл не найден";
-		$MESS["LOADER_KB"] = "кб";
-		$MESS["LOADER_LOAD_QUERY_SERVER"] = "Подключение к серверу...";
-		$MESS["LOADER_LOAD_QUERY_DISTR"] = "Запрашиваю файл #DISTR#";
-		$MESS["LOADER_LOAD_CONN2HOST"] = "Подключение к серверу #HOST#...";
-		$MESS["LOADER_LOAD_NO_CONN2HOST"] = "Не могу соединиться с #HOST#:";
-		$MESS["LOADER_LOAD_QUERY_FILE"] = "Запрашиваю файл...";
-		$MESS["LOADER_LOAD_WAIT"] = "Ожидаю ответ...";
-		$MESS["LOADER_LOAD_SERVER_ANSWER"] = "Ошибка загрузки. Сервер ответил: #ANS#";
-		$MESS["LOADER_LOAD_SERVER_ANSWER1"] = "Ошибка загрузки. У вас нет прав на доступ к этому файлу. Сервер ответил: #ANS#";
-		$MESS["LOADER_LOAD_NEED_RELOAD"] = "Ошибка загрузки. Докачка файла невозможна.";
-		$MESS["LOADER_LOAD_NO_WRITE2FILE"] = "Не могу открыть файл #FILE# на запись";
-		$MESS["LOADER_LOAD_LOAD_DISTR"] = "Загружаю файл #DISTR#";
-		$MESS["LOADER_LOAD_ERR_SIZE"] = "Ошибка размера файла";
-		$MESS["LOADER_LOAD_ERR_RENAME"] = "Не могу переименовать файл #FILE1# в файл #FILE2#";
-		$MESS["LOADER_LOAD_CANT_OPEN_WRITE"] = "Не могу открыть файл #FILE# на запись";
-		$MESS["LOADER_LOAD_CANT_WRITE"] = "Не могу записать файл #FILE#. Проверьте наличие свободного места на диске.";
-		$MESS["LOADER_LOAD_CANT_REDIRECT"] = "Ошибочное перенаправление на адрес #URL#. Проверьте адрес для скачивания.";
-		$MESS["LOADER_LOAD_CANT_OPEN_READ"] = "Не могу открыть файл #FILE# на чтение";
-		$MESS["LOADER_LOAD_LOADING"] = "Загружаю файл... дождитесь окончания загрузки...";
-		$MESS["LOADER_LOAD_FILE_SAVED"] = "Файл сохранен: #FILE# [#SIZE# байт]";
-		$MESS["LOADER_UNPACK_ACTION"] = "Распаковываю файл... дождитесь окончания распаковки...";
-		$MESS["LOADER_UNPACK_UNKNOWN"] = "Неизвестная ошибка. Повторите процесс еще раз или обратитесь в службу технической поддержки";
-		$MESS["LOADER_UNPACK_SUCCESS"] = "Файл успешно распакован";
-		$MESS["LOADER_UNPACK_ERRORS"] = "Файл распакован с ошибками";
-		$MESS["LOADER_KEY_DEMO"] = "Демонстрационная версия";
-		$MESS["LOADER_KEY_COMM"] = "Коммерческая версия";
-		$MESS["UPDATE_SUCCESS"] = "Обновлено успешно. <a href='?'>Открыть</a>.";
-		$MESS["LOADER_NEW_VERSION"] = "Доступна новая версия скрипта восстановления, но загрузить её не удалось";
+		$MESS["LOADER_SUBTITLE1"] = "Р—Р°РіСЂСѓР·РєР° СЂРµР·РµСЂРІРЅРѕР№ РєРѕРїРёРё";
+		$MESS["LOADER_SUBTITLE1_ERR"] = "РћС€РёР±РєР° Р·Р°РіСЂСѓР·РєРё";
+		$MESS["STATUS"] = "% РІС‹РїРѕР»РЅРµРЅРѕ";
+		$MESS["LOADER_MENU_UNPACK"] = "Р Р°СЃРїР°РєРѕРІРєР° С„Р°Р№Р»Р°";
+		$MESS["LOADER_TITLE_LIST"] = "Р’С‹Р±РѕСЂ С„Р°Р№Р»Р°";
+		$MESS["LOADER_TITLE_LOAD"] = "Р—Р°РіСЂСѓР·РєР° С„Р°Р№Р»Р° РЅР° СЃР°Р№С‚";
+		$MESS["LOADER_TITLE_UNPACK"] = "Р Р°СЃРїР°РєРѕРІРєР° С„Р°Р№Р»Р°";
+		$MESS["LOADER_TITLE_LOG"] = "РћС‚С‡РµС‚ РїРѕ Р·Р°РіСЂСѓР·РєРµ";
+		$MESS["LOADER_NEW_LOAD"] = "Р—Р°РіСЂСѓР·РёС‚СЊ";
+		$MESS["LOADER_BACK_2LIST"] = "Р’РµСЂРЅСѓС‚СЊСЃСЏ РІ СЃРїРёСЃРѕРє С„Р°Р№Р»РѕРІ";
+		$MESS["LOADER_LOG_ERRORS"] = "Р—Р°РіСЂСѓР·РєР° СЂРµР·РµСЂРІРЅРѕР№ РєРѕРїРёРё РЅРµ СѓРґР°Р»Р°СЃСЊ";
+		$MESS["LOADER_NO_LOG"] = "Log-С„Р°Р№Р» РЅРµ РЅР°Р№РґРµРЅ";
+		$MESS["LOADER_KB"] = "РєР±";
+		$MESS["LOADER_LOAD_QUERY_DISTR"] = "Р—Р°РїСЂР°С€РёРІР°СЋ С„Р°Р№Р» #DISTR#";
+		$MESS["LOADER_LOAD_CONN2HOST"] = "РџРѕРґРєР»СЋС‡РµРЅРёРµ Рє СЃРµСЂРІРµСЂСѓ #HOST#";
+		$MESS["LOADER_LOAD_NO_CONN2HOST"] = "РќРµ РјРѕРіСѓ СЃРѕРµРґРёРЅРёС‚СЊСЃСЏ СЃ #HOST#:";
+		$MESS["LOADER_LOAD_QUERY_FILE"] = "Р—Р°РїСЂР°С€РёРІР°СЋ С„Р°Р№Р»";
+		$MESS["LOADER_LOAD_WAIT"] = "РћР¶РёРґР°СЋ РѕС‚РІРµС‚";
+		$MESS["LOADER_LOAD_SERVER_ANSWER"] = "РћС€РёР±РєР° Р·Р°РіСЂСѓР·РєРё. РЎРµСЂРІРµСЂ РѕС‚РІРµС‚РёР»: #ANS#";
+		$MESS["LOADER_LOAD_SERVER_ANSWER1"] = "РћС€РёР±РєР° Р·Р°РіСЂСѓР·РєРё. РЈ РІР°СЃ РЅРµС‚ РїСЂР°РІ РЅР° РґРѕСЃС‚СѓРї Рє СЌС‚РѕРјСѓ С„Р°Р№Р»Сѓ. РЎРµСЂРІРµСЂ РѕС‚РІРµС‚РёР»: #ANS#";
+		$MESS["LOADER_LOAD_NEED_RELOAD"] = "РћС€РёР±РєР° Р·Р°РіСЂСѓР·РєРё. Р”РѕРєР°С‡РєР° С„Р°Р№Р»Р° РЅРµРІРѕР·РјРѕР¶РЅР°.";
+		$MESS["LOADER_LOAD_NO_WRITE2FILE"] = "РќРµ РјРѕРіСѓ РѕС‚РєСЂС‹С‚СЊ С„Р°Р№Р» #FILE# РЅР° Р·Р°РїРёСЃСЊ";
+		$MESS["LOADER_LOAD_LOAD_DISTR"] = "Р—Р°РіСЂСѓР¶Р°СЋ С„Р°Р№Р» #DISTR#";
+		$MESS["LOADER_LOAD_ERR_SIZE"] = "РћС€РёР±РєР° СЂР°Р·РјРµСЂР° С„Р°Р№Р»Р°";
+		$MESS["LOADER_LOAD_ERR_RENAME"] = "РќРµ РјРѕРіСѓ РїРµСЂРµРёРјРµРЅРѕРІР°С‚СЊ С„Р°Р№Р» #FILE1# РІ С„Р°Р№Р» #FILE2#";
+		$MESS["LOADER_LOAD_CANT_OPEN_WRITE"] = "РќРµ РјРѕРіСѓ РѕС‚РєСЂС‹С‚СЊ С„Р°Р№Р» #FILE# РЅР° Р·Р°РїРёСЃСЊ";
+		$MESS["LOADER_LOAD_CANT_WRITE"] = "РќРµ РјРѕРіСѓ Р·Р°РїРёСЃР°С‚СЊ С„Р°Р№Р» #FILE#. РџСЂРѕРІРµСЂСЊС‚Рµ РЅР°Р»РёС‡РёРµ СЃРІРѕР±РѕРґРЅРѕРіРѕ РјРµСЃС‚Р° РЅР° РґРёСЃРєРµ.";
+		$MESS["ERROR_IP_CHANGED"] = "IP Р°РґСЂРµСЃ РєР»РёРµРЅС‚Р° РёР·РјРµРЅРёР»СЃСЏ, РїСЂРѕРґРѕР»Р¶РµРЅРёРµ РЅРµРІРѕР·РјРѕР¶РЅРѕ.";
+		$MESS["ERROR_INIT_TIMESTAMP"] = "Р’СЂРµРјСЏ СЂР°Р±РѕС‚С‹ СЃРєСЂРёРїС‚Р° РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёСЏ РёСЃС‚РµРєР»Рѕ. Р—Р°РіСЂСѓР·РёС‚Рµ РЅРѕРІСѓСЋ РІРµСЂСЃРёСЋ.";
+		$MESS["LOADER_LOAD_CANT_REDIRECT"] = "РћС€РёР±РѕС‡РЅРѕРµ РїРµСЂРµРЅР°РїСЂР°РІР»РµРЅРёРµ РЅР° Р°РґСЂРµСЃ #URL#. РџСЂРѕРІРµСЂСЊС‚Рµ Р°РґСЂРµСЃ РґР»СЏ СЃРєР°С‡РёРІР°РЅРёСЏ.";
+		$MESS["LOADER_LOAD_CANT_OPEN_READ"] = "РќРµ РјРѕРіСѓ РѕС‚РєСЂС‹С‚СЊ С„Р°Р№Р» #FILE# РЅР° С‡С‚РµРЅРёРµ";
+		$MESS["LOADER_LOAD_LOADING"] = "Р—Р°РіСЂСѓР¶Р°СЋ С„Р°Р№Р», РґРѕР¶РґРёС‚РµСЃСЊ РѕРєРѕРЅС‡Р°РЅРёСЏ Р·Р°РіСЂСѓР·РєРё...";
+		$MESS["LOADER_LOAD_FILE_SAVED"] = "Р¤Р°Р№Р» СЃРѕС…СЂР°РЅРµРЅ: #FILE# [#SIZE# Р±Р°Р№С‚]";
+		$MESS["LOADER_UNPACK_ACTION"] = "Р Р°СЃРїР°РєРѕРІС‹РІР°СЋ С„Р°Р№Р», РґРѕР¶РґРёС‚РµСЃСЊ РѕРєРѕРЅС‡Р°РЅРёСЏ СЂР°СЃРїР°РєРѕРІРєРё...";
+		$MESS["LOADER_UNPACK_UNKNOWN"] = "РќРµРёР·РІРµСЃС‚РЅР°СЏ РѕС€РёР±РєР°. РџРѕРІС‚РѕСЂРёС‚Рµ РїСЂРѕС†РµСЃСЃ РµС‰Рµ СЂР°Р· РёР»Рё РѕР±СЂР°С‚РёС‚РµСЃСЊ РІ СЃР»СѓР¶Р±Сѓ С‚РµС…РЅРёС‡РµСЃРєРѕР№ РїРѕРґРґРµСЂР¶РєРё";
+		$MESS["LOADER_UNPACK_SUCCESS"] = "Р¤Р°Р№Р» СѓСЃРїРµС€РЅРѕ СЂР°СЃРїР°РєРѕРІР°РЅ";
+		$MESS["LOADER_UNPACK_ERRORS"] = "Р¤Р°Р№Р» СЂР°СЃРїР°РєРѕРІР°РЅ СЃ РѕС€РёР±РєР°РјРё";
+		$MESS["LOADER_KEY_DEMO"] = "Р”РµРјРѕРЅСЃС‚СЂР°С†РёРѕРЅРЅР°СЏ РІРµСЂСЃРёСЏ";
+		$MESS["LOADER_KEY_COMM"] = "РљРѕРјРјРµСЂС‡РµСЃРєР°СЏ РІРµСЂСЃРёСЏ";
+		$MESS["UPDATE_SUCCESS"] = "РћР±РЅРѕРІР»РµРЅРѕ СѓСЃРїРµС€РЅРѕ. <a href='?'>РћС‚РєСЂС‹С‚СЊ</a>.";
+		$MESS["LOADER_NEW_VERSION"] = "Р”РѕСЃС‚СѓРїРЅР° РЅРѕРІР°СЏ РІРµСЂСЃРёСЏ СЃРєСЂРёРїС‚Р° РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёСЏ, РЅРѕ Р·Р°РіСЂСѓР·РёС‚СЊ РµС‘ РЅРµ СѓРґР°Р»РѕСЃСЊ";
+	}
+	elseif (LANG == 'de')
+	{
+		$MESS["LOADER_SUBTITLE1"] = "Wird geladen";
+		$MESS["LOADER_SUBTITLE1_ERR"] = "Fehler beim Laden";
+		$MESS["STATUS"] = "% erldingt";
+		$MESS["LOADER_MENU_LIST"] = "Paket auswГ¤hlen";
+		$MESS["LOADER_MENU_UNPACK"] = "Datei entpacken";
+		$MESS["LOADER_TITLE_LIST"] = "Datei auswГ¤hlen";
+		$MESS["LOADER_TITLE_LOAD"] = "Datei wird auf die Website hochgeladen";
+		$MESS["LOADER_TITLE_UNPACK"] = "Datei entpacken";
+		$MESS["LOADER_TITLE_LOG"] = "Bericht hochladen";
+		$MESS["LOADER_NEW_ED"] = "Paketedition";
+		$MESS["LOADER_NEW_AUTO"] = "Nach dem Upload Entpacken automatisch starten";
+		$MESS["LOADER_NEW_STEPS"] = "Schrittweise mit einem Zeitabstand laden:";
+		$MESS["LOADER_NEW_STEPS0"] = "unbegrenzt";
+		$MESS["LOADER_NEW_LOAD"] = "Herunterladen";
+		$MESS["LOADER_BACK_2LIST"] = "ZurГјck zur Liste der Pakete";
+		$MESS["LOADER_LOG_ERRORS"] = "Fehler ist aufgetreten";
+		$MESS["LOADER_NO_LOG"] = "Log-Datei nicht gefunden";
+		$MESS["LOADER_KB"] = "Kb";
+		$MESS["LOADER_LOAD_QUERY_DISTR"] = "Paket #DISTR# wird angefragt";
+		$MESS["LOADER_LOAD_CONN2HOST"] = "Verbindung mit #HOST#";
+		$MESS["LOADER_LOAD_NO_CONN2HOST"] = "Keine Verbindung mit #HOST#:";
+		$MESS["LOADER_LOAD_QUERY_FILE"] = "Datei wird angefragt...";
+		$MESS["LOADER_LOAD_WAIT"] = "Auf Antwort gewartet...";
+		$MESS["LOADER_LOAD_SERVER_ANSWER"] = "Fehler beim Herunterladen. Die Antwort vom Server war: #ANS#";
+		$MESS["LOADER_LOAD_SERVER_ANSWER1"] = "Fehler beim Herunterladen. Sie kГ¶nnen dieses Paket nicht herunterladen. Die Antwort vom Server war: #ANS#";
+		$MESS["LOADER_LOAD_NEED_RELOAD"] = "Fehler beim Herunterladen. Der Prozess kann nicht fortgesetzt.";
+		$MESS["LOADER_LOAD_NO_WRITE2FILE"] = "Die Datei #FILE# kann nicht zum Schreiben geГ¶ffnet werden";
+		$MESS["LOADER_LOAD_LOAD_DISTR"] = "Das Paket #DISTR# wird heruntergeladen";
+		$MESS["LOADER_LOAD_ERR_SIZE"] = "Fehler der DateigrГ¶Гџe";
+		$MESS["LOADER_LOAD_ERR_RENAME"] = "Die Datei #FILE1# kann nicht in #FILE2# umbenannt werden";
+		$MESS["LOADER_LOAD_CANT_OPEN_WRITE"] = "Die Datei #FILE# kann nicht zum Schreiben geГ¶ffnet werden";
+		$MESS["LOADER_LOAD_CANT_WRITE"] = "In der Datei #FILE# kann nicht geschrieben werden. ГњberprГјfen Sie Ihren Speicherplatz.";
+		$MESS["ERROR_IP_CHANGED"] = "IP address has changed. Permission denied.";
+		$MESS["ERROR_INIT_TIMESTAMP"] = "This script is outdated. Please upload the new version.";
+		$MESS["LOADER_LOAD_CANT_REDIRECT"] = "Inkorrekte Weiterleitung an #URL#. ГњberprГјfen Sie die Download-URL.";
+		$MESS["LOADER_LOAD_CANT_OPEN_READ"] = "Die Datei #FILE# kann nicht zum Lesen geГ¶ffnet werden";
+		$MESS["LOADER_LOAD_LOADING"] = "Es wird nun heruntergeladen. Bitte warten...";
+		$MESS["LOADER_LOAD_FILE_SAVED"] = "Datei gespeichert: #FILE# [#SIZE# bytes]";
+		$MESS["LOADER_UNPACK_ACTION"] = "Das Paket wird entpackt. Bitte warten...";
+		$MESS["LOADER_UNPACK_UNKNOWN"] = "Unbekannter Fehler ist aufgetreten. versuchen Sie spГ¤ter erneut oder wenden Sie sich an den technischen Support";
+		$MESS["LOADER_UNPACK_SUCCESS"] = "Die Datei wurde erfolgreich entpackt";
+		$MESS["LOADER_UNPACK_ERRORS"] = "Beim Entpacken der Datei sind Fehler aufgetreten";
+		$MESS["LOADER_KEY_DEMO"] = "Demoversion";
+		$MESS["LOADER_KEY_COMM"] = "Kommerzielle Version";
+		$MESS["UPDATE_SUCCESS"] = "Aktualisierung war erfolgreich. <a href='?'>Г–ffnen</a>.";
+		$MESS["LOADER_NEW_VERSION"] = "Beim Aktualisieren des Scripts restore.php ist ein Fehler aufgetreten.";
 	}
 	else
 	{
@@ -336,7 +486,6 @@ $mArr_en = array(
 		$MESS["LOADER_LOG_ERRORS"] = "Error occured";
 		$MESS["LOADER_NO_LOG"] = "Log file not found";
 		$MESS["LOADER_KB"] = "kb";
-		$MESS["LOADER_LOAD_QUERY_SERVER"] = "Connecting server...";
 		$MESS["LOADER_LOAD_QUERY_DISTR"] = "Requesting package #DISTR#";
 		$MESS["LOADER_LOAD_CONN2HOST"] = "Connection to #HOST#...";
 		$MESS["LOADER_LOAD_NO_CONN2HOST"] = "Cannot connect to #HOST#:";
@@ -351,6 +500,8 @@ $mArr_en = array(
 		$MESS["LOADER_LOAD_ERR_RENAME"] = "Cannot rename file #FILE1# to #FILE2#";
 		$MESS["LOADER_LOAD_CANT_OPEN_WRITE"] = "Cannot open file #FILE# for writing";
 		$MESS["LOADER_LOAD_CANT_WRITE"] = "Cannot write to file #FILE#. Check your hard disk space.";
+		$MESS["ERROR_IP_CHANGED"] = "IP address has changed. Permission denied.";
+		$MESS["ERROR_INIT_TIMESTAMP"] = "This script is outdated. Please upload the new version.";
 		$MESS["LOADER_LOAD_CANT_REDIRECT"] = "Wrong redirect to #URL#. Check download url.";
 		$MESS["LOADER_LOAD_CANT_OPEN_READ"] = "Cannot open file #FILE# for reading";
 		$MESS["LOADER_LOAD_LOADING"] = "Download in progress. Please wait...";
@@ -374,7 +525,7 @@ if ($_REQUEST['source'] == 'dump')
 $Step = IntVal($_REQUEST["Step"]);
 
 $strErrMsg = '';
-if (!$Step && $_SERVER['REQUEST_METHOD'] == 'GET')
+if (!$debug && !$Step && $_SERVER['REQUEST_METHOD'] == 'GET')
 {
 	$this_script_name = basename(__FILE__);
 	$bx_host = 'www.1c-bitrix.ru';
@@ -382,7 +533,7 @@ if (!$Step && $_SERVER['REQUEST_METHOD'] == 'GET')
 	$form = '';
 
 	// Check for updates
-	$res = @fsockopen($bx_host, 80, $errno, $errstr, 3);
+	$res = fsockopen('ssl://'.$bx_host, 443, $errno, $errstr, 3);
 
 	if($res)
 	{
@@ -394,12 +545,12 @@ if (!$Step && $_SERVER['REQUEST_METHOD'] == 'GET')
 
 		while ($line = fgets($res, 4096))
 		{
-			if (@preg_match("/Content-Length: *([0-9]+)/i", $line, $regs))
+			if (preg_match("/Content-Length: *([0-9]+)/i", $line, $regs))
 			{
 				if (filesize(__FILE__) != trim($regs[1]))
 				{
 					$tmp_name = $this_script_name.'.tmp';
-					if (LoadFile('http://'.$bx_host.$bx_url, $tmp_name))
+					if (LoadFile('https://'.$bx_host.$bx_url, $tmp_name))
 					{
 						if (rename($_SERVER['DOCUMENT_ROOT'].'/'.$tmp_name,__FILE__))
 						{
@@ -420,10 +571,37 @@ if (!$Step && $_SERVER['REQUEST_METHOD'] == 'GET')
 	}
 }
 
+
+if (!$debug)
+{
+	if (IP_LIMIT == IP_LIMIT_DEFAULT)
+	{
+		($str = file_get_contents(__FILE__)) || die(str_replace("#FILE#", __FILE__, LoaderGetMessage("LOADER_LOAD_CANT_OPEN_READ")));
+		$size = strlen($str);
+		$str = str_replace(IP_LIMIT, $_SERVER['REMOTE_ADDR'], $str);
+		$str = str_replace(INIT_TIMESTAMP, time(), $str);
+		$str = str_pad($str, $size, ' ');
+		file_put_contents(__FILE__, $str) || die(str_replace("#FILE#", __FILE__, LoaderGetMessage("LOADER_LOAD_CANT_WRITE")));
+		bx_accelerator_reset();
+		header('Location: '.$_SERVER['REQUEST_URI']);
+		die();
+	}
+	elseif ($_SERVER['REMOTE_ADDR'] != IP_LIMIT)
+		$strErrMsg = LoaderGetMessage('ERROR_IP_CHANGED');
+	elseif (time() - INIT_TIMESTAMP > 86400)
+		$strErrMsg = LoaderGetMessage('ERROR_INIT_TIMESTAMP');
+
+	if ($strErrMsg)
+	{
+		echo '<div style="color:red">'.getMsg('ERR_MSG').' '.$strErrMsg.'</div>';
+		die();
+	}
+}
+
 if ($_REQUEST['LoadFileList'])
 {
 	$strLog = '';
-	if (LoadFile("http://www.1c-bitrix.ru/buy_tmp/backup.php?license=".md5(trim($_REQUEST['license_key']))."&lang=".LANG."&action=get_info", $file = $_SERVER['DOCUMENT_ROOT'].'/file_list.xml') && ($str = file_get_contents($file)))
+	if (LoadFile("https://www.1c-bitrix.ru/buy_tmp/backup.php?license=".md5(trim($_REQUEST['license_key']))."&lang=".LANG."&action=get_info", $file = $_SERVER['DOCUMENT_ROOT'].'/file_list.xml') && ($str = file_get_contents($file)))
 	{
 		if (preg_match_all('/<file name="([^"]+)" size="([^"]+)".*?\\/>/', $str, $regs))
 		{
@@ -473,17 +651,14 @@ elseif ($Step == 2 && !$bSelectDumpStep)
 		$arHeaders = array();
 
 	$source = $_REQUEST['source'];
-	if ($source == 'bitrixcloud')
+	if ($source == 'bitrixcloud' && !$_REQUEST['arc_down_url'])
 	{
-		$source = 'download';
 		$strLog = '';
-		if (LoadFile('http://www.1c-bitrix.ru/buy_tmp/backup.php?license='.md5(trim($_REQUEST['license_key'])).'&lang='.LANG.'&action=read_file&file_name='.urlencode($_REQUEST['bitrixcloud_backup']).'&check_word='.CTar::getCheckword($_REQUEST['EncryptKey']), $file = $_SERVER['DOCUMENT_ROOT'].'/file_info.xml') && ($str = file_get_contents($file)))
+		if (LoadFile('https://www.1c-bitrix.ru/buy_tmp/backup.php?license='.md5(trim($_REQUEST['license_key'])).'&lang='.LANG.'&action=read_file&file_name='.urlencode($_REQUEST['bitrixcloud_backup']).'&check_word='.CTar::getCheckword($_REQUEST['EncryptKey']), $file = $_SERVER['DOCUMENT_ROOT'].'/file_info.xml') && ($str = file_get_contents($file)))
 		{
 			unlink($file);
-//			echo htmlspecialcharsbx($str);
 
 			$host = preg_match('#<host>([^<]+)</host>#i',$str,$regs) ? $regs[1] : false;
-//			$port = preg_match('#<port>([^<]+)</port>#i',$str,$regs) ? $regs[1] : false;
 			$path = preg_match('#<path>([^<]+)</path>#i',$str,$regs) ? $regs[1] : false;
 
 			if (preg_match_all('/<header name="([^"]+)" value="([^"]+)".*?\\/>/', $str, $regs))
@@ -513,51 +688,77 @@ elseif ($Step == 2 && !$bSelectDumpStep)
 			'<input type="hidden" name="bitrixcloud_backup" value="'.htmlspecialcharsbx($_REQUEST['bitrixcloud_backup']).'">'.
 			'<input type="hidden" name="Step" value="2">';
 			$bottom .= '
-			<input type="button" value="'.getMsg('BUT_TEXT_BACK').'" onClick="document.location=\'/restore.php?Step=1&lang='.LANG.'\'">
+			<a href="/restore.php?Step=1&lang='.LANG.'">'.getMsg('BUT_TEXT_BACK').'</a>
 			<input type="button" id="start_button" value="'.getMsg("BUT_TEXT1", LANG).'" onClick="reloadPage(2, \''. LANG.'\')">';
 			showMsg(getMsg('TITLE1'),$text,$bottom);
 			die();
 		}
 	}
 
-	if ($source == 'download')
+	if ($source == 'download' || $source == 'bitrixcloud')
 	{
 		$strUrl = $_REQUEST['arc_down_url'];
-
-		if (!preg_match('#http://#',$strUrl))
-			$strUrl = 'http://'.$strUrl;
-		$arc_name = trim(basename($strUrl));
-
-		$strLog = '';
-		$status = '';
-
-		if ($_REQUEST['continue'])
+		$res = false;
+		if ($strUrl)
 		{
-			$res = LoadFile($strUrl, $_SERVER['DOCUMENT_ROOT'].'/'.$arc_name, $arHeaders);
-			if (file_exists($file = $_SERVER['DOCUMENT_ROOT'].'/'.$arc_name))
-			{
-				if ($res == 1)
-				{
-					$f = fopen($_SERVER['DOCUMENT_ROOT'].'/'.$arc_name, 'rb');
-					$id = fread($f, 2);
-					fclose($f);
+			if (!preg_match('#https?://#',$strUrl))
+				$strUrl = 'http://'.$strUrl;
+			$arc_name = trim(basename($strUrl));
 
-					if ($id != chr(31).chr(139)) // not gzip
+			if ($arc_name == CTar::getFirstName($arc_name))
+			{
+				$full = false;
+				$tar = new CTar();
+				$n = CTar::getLastNum($_SERVER['DOCUMENT_ROOT'].'/'.$arc_name);
+				$arc_name1 = $arc_name;
+				while(file_exists($_SERVER['DOCUMENT_ROOT'].'/'.$arc_name1))
+				{
+					if ($n && $arc_name1 == $arc_name.'.'.$n)
 					{
-						$s = filesize($_SERVER['DOCUMENT_ROOT'].'/'.$arc_name);
-						if ($s%512 > 0) // not tar
+						$full = true;
+						break;
+					}
+					$arc_name1 = $tar->getNextName($arc_name1);
+				}
+
+				if (!$full)
+				{
+					$strUrl = str_replace($arc_name, $arc_name1, $strUrl);
+					$_REQUEST['bitrixcloud_backup'] = $arc_name = $arc_name1;
+				}
+			}
+
+			$strLog = '';
+			$status = '';
+
+			if ($_REQUEST['continue'])
+			{
+				$res = LoadFile($strUrl, $_SERVER['DOCUMENT_ROOT'].'/'.$arc_name, $arHeaders);
+				if (file_exists($file = $_SERVER['DOCUMENT_ROOT'].'/'.$arc_name))
+				{
+					if ($res == 1)
+					{
+						$f = fopen($_SERVER['DOCUMENT_ROOT'].'/'.$arc_name, 'rb');
+						$id = fread($f, 2);
+						fclose($f);
+
+						if ($id != chr(31).chr(139)) // not gzip
 						{
-							unlink($_SERVER['DOCUMENT_ROOT'].'/'.$arc_name);
-							$res = false;
+							$s = filesize($_SERVER['DOCUMENT_ROOT'].'/'.$arc_name);
+							if ($s == 0 || $s%512 > 0) // not tar
+							{
+								unlink($_SERVER['DOCUMENT_ROOT'].'/'.$arc_name);
+								$res = false;
+							}
 						}
 					}
 				}
 			}
-		}
-		else // начало закачки
-		{
-			$res = 2;
-			SetCurrentProgress(0);
+			else
+			{
+				$res = 2;
+				SetCurrentProgress(0);
+			}
 		}
 
 		if ($res)
@@ -573,25 +774,29 @@ elseif ($Step == 2 && !$bSelectDumpStep)
 				$text .= '<input type=hidden name=arc_down_url value="'.htmlspecialcharsbx($strUrl).'">';
 				$text .= '<input type=hidden name=source value=download>';
 				$text .= '<input type=hidden name="bitrixcloud_backup" value="'.htmlspecialcharsbx($_REQUEST['bitrixcloud_backup']).'">';
-				foreach($arHeaders as $k=>$v)
-					$text .= '<input type=hidden name="arHeaders['.htmlspecialcharsbx($k).']" value="'.htmlspecialcharsbx($v).'">';
 			}
 			else
 			{
+				$tar = new CTar();
 				$text .= '<input type=hidden name=try_next value=Y>';
 				if (count($arHeaders)) // bitrixcloud
 				{
 					$text .= '<input type=hidden name=source value=bitrixcloud>';
-					$text .= '<input type=hidden name="bitrixcloud_backup" value="'.htmlspecialcharsbx(CTar::getNextName($_REQUEST['bitrixcloud_backup'])).'">';
+					$text .= '<input type=hidden name="bitrixcloud_backup" value="'.htmlspecialcharsbx($tar->getNextName($_REQUEST['bitrixcloud_backup'])).'">';
 				}
 				else
 				{
 					$text .= '<input type=hidden name=source value=download>';
-					$text .= '<input type=hidden name=arc_down_url value="'.htmlspecialcharsbx(CTar::getNextName($strUrl)).'">';
+					$text .= '<input type=hidden name=arc_down_url value="'.htmlspecialcharsbx($tar->getNextName($strUrl)).'">';
 				}
 			}
+			if (count($arHeaders))
+			{
+				foreach($arHeaders as $k=>$v)
+					$text .= '<input type=hidden name="arHeaders['.htmlspecialcharsbx($k).']" value="'.htmlspecialcharsbx($v).'">';
+			}
 		}
-		elseif ($_REQUEST['try_next']) // пробовали новую часть
+		elseif ($_REQUEST['try_next'])
 		{
 			$text = getMsg('ARC_DOWN_OK').
 			'<input type=hidden name=Step value=2>'.
@@ -604,36 +809,47 @@ elseif ($Step == 2 && !$bSelectDumpStep)
 		}
 		else
 		{
-			if ($_REQUEST['source'] != 'bitrixcloud' && $replycode == 403 && count($arHeaders)) // Retry for bitrixcloud
+			if ($_REQUEST['bitrixcloud_backup'] && $replycode == 403 && count($arHeaders) && (!$_REQUEST['timestamp'] || time() - $_REQUEST['timestamp'] > 10)) // Retry for bitrixcloud
 			{
+				$status = '<div>'.getMsg('BITRIXCLOUD_KEYS').'</div>';
 				$text = getMsg('ARC_DOWN_PROCESS').' <b>'.htmlspecialcharsbx($arc_name).'</b>' . $status .
 					'<input type=hidden name=Step value=2>'.
+					'<input type=hidden name=timestamp value='.time().'>'.
 					'<input type=hidden name=continue value=Y>'.
 					'<input type=hidden name="EncryptKey" value="'.htmlspecialcharsbx($_REQUEST['EncryptKey']).'">'.
 					'<input type=hidden name="license_key" value="'.htmlspecialcharsbx($_REQUEST['license_key']).'">';
 				$text .= '<input type=hidden name=source value=bitrixcloud>';
 				$text .= '<input type=hidden name="bitrixcloud_backup" value="'.htmlspecialcharsbx($_REQUEST['bitrixcloud_backup']).'">';
-
-//				$text .= '<input type=hidden name=arc_down_url value="'.htmlspecialcharsbx($strUrl).'">';
 			}
 			else
 			{
 				$ar = array(
 					'TITLE' => LoaderGetMessage('LOADER_SUBTITLE1_ERR'),
 					'TEXT' => nl2br($strLog),
-					'BOTTOM' => '<input type="button" value="'.getMsg('BUT_TEXT_BACK').'" onClick="document.location=\'/restore.php?Step=1&lang='.LANG.'\'"> '
+					'BOTTOM' => '<a href="/restore.php?Step=1&lang='.LANG.'">'.getMsg('BUT_TEXT_BACK').'</a>'
 				);
 				html($ar);
 				die();
 			}
 		}
-		$bottom = '<input type="button" value="'.getMsg('BUT_TEXT_BACK').'" onClick="document.location=\'/restore.php?Step=1&lang='.LANG.'\'"> ';
+		$bottom = '<a href="/restore.php?Step=1&lang='.LANG.'">'.getMsg('BUT_TEXT_BACK').'</a>';
 		showMsg(LoaderGetMessage('LOADER_SUBTITLE1'),$text,$bottom);
 		?><script>reloadPage(2, '<?= LANG?>', 1);</script><?
 		die();
 	}
 	elseif($source == 'upload')
 	{
+		if (!count($_FILES['archive']['tmp_name']))
+		{
+			$ar = array(
+				'TITLE' => getMsg('ERR_EXTRACT'),
+				'TEXT' => getMsg('ERR_UPLOAD'),
+				'BOTTOM' => '<a href="/restore.php?Step=1&lang='.LANG.'">'.getMsg('BUT_TEXT_BACK').'</a>'
+			);
+			html($ar);
+			die();
+		}
+
 		foreach($_FILES['archive']['tmp_name'] as $k => $v)
 		{
 			if (!$v)
@@ -644,7 +860,7 @@ elseif ($Step == 2 && !$bSelectDumpStep)
 				$ar = array(
 					'TITLE' => getMsg('ERR_EXTRACT'),
 					'TEXT' => getMsg('ERR_UPLOAD'),
-					'BOTTOM' => '<input type="button" value="'.getMsg('BUT_TEXT_BACK').'" onClick="document.location=\'/restore.php?Step=1&lang='.LANG.'\'"> '
+					'BOTTOM' => '<a href="/restore.php?Step=1&lang='.LANG.'">'.getMsg('BUT_TEXT_BACK').'</a>'
 				);
 				html($ar);
 				die();
@@ -687,7 +903,7 @@ if(!$Step)
 			($strErrMsg ? '<div style="color:red;padding:10px;border:1px solid red">'.$strErrMsg.'</div>' : '').
 			getMsg('BEGIN'),
 		'BOTTOM' =>
-		(defined('VMBITRIX') ? '<input type=button value="'.getMsg('BUT_TEXT_BACK').'" onClick="document.location=\'/\'"> ' : '').
+		(defined('VMBITRIX') ? '<a href="/?lang='.LANG.'">'.getMsg('BUT_TEXT_BACK').'</a> ' : '').
 		'<input type="button" value="'.getMsg("BUT_TEXT1", LANG).'" onClick="reloadPage(1,\''.LANG.'\')">'
 	);
 	html($ar);
@@ -714,18 +930,18 @@ elseif($Step == 1)
 				'<input type="hidden" name="Step" value="2">'.
 				'<div class=t_div>
 					<label><input type=radio name=x_source onclick="div_show(0)" '.($_REQUEST['bitrixcloud_backup'] ? 'checked' : '').'>'.getMsg("ARC_DOWN_BITRIXCLOUD", LANG).'</label>
-					<div id=div0 class="div-tool" style="display:none" align="right">
-						<nobr>'.getMsg("LICENSE_KEY").'</nobr> <input name=license_key id=license_key size=30 value="'.htmlspecialcharsbx($license_key).'"> <input type="button" value=" OK " onclick="LoadFileList()"><br>
+					<div id=div0 class="div-tool" style="display:none">
+						<nobr>'.getMsg("LICENSE_KEY").'</nobr> <input name=license_key type="text" id=license_key size=30 value="'.htmlspecialcharsbx($license_key).'"> <input type="button" value=" OK " onclick="LoadFileList()"><br>
 						<div id=file_list></div>
 					</div>
 				</div>
 				<div class=t_div>
 					<label><input type=radio name=x_source onclick="div_show(1)" '.($_REQUEST['arc_down_url'] ? 'checked' : '').'>'.getMsg("ARC_DOWN", LANG).'</label>
-					<div id=div1 class="div-tool" style="display:none" align="right"><nobr>'.getMsg("ARC_DOWN_URL").'</nobr> <input name=arc_down_url size=40 value="'.htmlspecialcharsbx($arc_down_url).'"></div>
+					<div id=div1 class="div-tool" style="display:none"><nobr>'.getMsg("ARC_DOWN_URL").'</nobr> <input name=arc_down_url type="text" size=40 value="'.htmlspecialcharsbx($arc_down_url).'"></div>
 				</div>
 				<div class=t_div>
 					<label><input type=radio name=x_source onclick="div_show(2)">'. getMsg("ARC_LOCAL", LANG).'</label>
-					<div id=div2 class="div-tool" style="display:none"><span style="color:#666">'.getMsg("ARC_LOCAL_WARN", LANG).'</span><input type=file name="archive[]" size=40 multiple onchange="addFileField()"></div>
+					<div id=div2 class="div-tool" style="display:none"><span style="color:#666">'.getMsg("ARC_LOCAL_WARN", LANG).'</span><br/><input type=file name="archive[]" size=40 multiple onchange="addFileField()"></div>
 				</div>
 				'
 				.(strlen($option) ?
@@ -744,89 +960,10 @@ elseif($Step == 1)
 				</div>' : '')
 				,
 		'BOTTOM' =>
-		'<input type="button" value="'.getMsg('BUT_TEXT_BACK').'" onClick="document.location=\'/restore.php?Step=&lang='.LANG.'\'"> '.
+		'<a href="/restore.php?Step=0&lang='.LANG.'">'.getMsg('BUT_TEXT_BACK').'</a> '.
 		'<input type="button" id="start_button" value="'.getMsg("BUT_TEXT1", LANG).'" onClick="reloadPage(2,\''.LANG.'\')" '.($local_arc_name ? '' : 'disabled').'>'
 	);
 	html($ar);
-	?>
-	<script>
-		function addFileField()
-		{
-			var input = document.createElement('input');
-			input.type = 'file';
-			input.name = 'archive[]';
-			input.size = 40;
-			input.onchange = addFileField;
-			input.multiple = true;
-
-			var div = document.getElementById('div2');
-			div.appendChild(input);
-		}
-
-		function div_show(i)
-		{
-			document.getElementById('start_button').disabled = i == 0;
-			for(j=0;j<=4;j++)
-			{
-				if (ob = document.getElementById('div' + j))
-					ob.style.display = i == j ? 'block' : 'none';
-			}
-
-			arSources = [ 'bitrixcloud','download','upload','local','dump' ];
-			strAdditionalParams = '&source=' + arSources[i]; // Если большой POST запрос очищается сервером, то данные GET сохранятся для дальнейшей обработки
-		}
-
-		function LoadFileList()
-		{
-			xml = new XMLHttpRequest(); // forget IE6
-
-			xml.onreadystatechange = function ()
-			{
-				if (xml.readyState == 4)
-				{
-					str = xml.responseText;
-					document.getElementById('file_list').innerHTML = str;
-					document.getElementById('start_button').disabled = !/<select/.test(str);
-				}
-			}
-
-			xml.open('POST', '/restore.php', true);
-			query = 'LoadFileList=Y&lang=<?=LANG?>&bitrixcloud_backup=<?=htmlspecialcharsbx($_REQUEST['bitrixcloud_backup'])?>&license_key=' + document.getElementById('license_key').value;
-
-			xml.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
-			xml.send(query);
-		}
-
-		<?
-		if ($_REQUEST['arc_down_url'])
-		{
-			?>
-			window.onload = div_show(1);
-			<?
-		}
-		elseif ($_REQUEST['bitrixcloud_backup'])
-		{
-			?>
-			window.onload = function() {
-				div_show(0);
-				LoadFileList();
-			}
-			<?
-		}
-		?>
-	</script>
-	<style type="text/css">
-		.div-tool
-		{
-			border:1px solid #CCCCCC;
-			padding:10px;
-		}
-		.t_div
-		{
-			padding:5px;
-		}
-	</style>
-	<?
 }
 elseif($Step == 2)
 {
@@ -837,7 +974,7 @@ elseif($Step == 2)
 		$tar->ReadBlockCurrent = intval($_REQUEST['ReadBlockCurrent']);
 		$tar->EncryptKey = $_REQUEST['EncryptKey'];
 
-		$bottom = '<input type="button" value="'.getMsg('BUT_TEXT_BACK').'" onClick="document.location=\'/restore.php?Step=1&lang='.LANG.'\'"> ';
+		$bottom = '<a href="/restore.php?Step=1&lang='.LANG.'">'.getMsg('BUT_TEXT_BACK').'</a> ';
 
 		if ($rs = $tar->openRead($file1 = $file = $_SERVER['DOCUMENT_ROOT'].'/'.$arc_name))
 		{
@@ -855,7 +992,7 @@ elseif($Step == 2)
 					$ArchiveSize = filesize($file) * 2; // for standard gzip files
 				$DataSize = $ArchiveSize;
 
-				while(file_exists($file1 = CTar::getNextName($file1)))
+				while(file_exists($file1 = $tar->getNextName($file1)))
 					$DataSize += $ArchiveSize;
 
 				$r = true;
@@ -883,7 +1020,7 @@ elseif($Step == 2)
 				{
 					if ($_REQUEST['skip'])
 					{
-						$tar->readHeader();
+						while($tar->readHeader() === false);
 						$tar->SkipFile();
 					}
 					while(($r = $tar->extractFile()) && haveTime());
@@ -901,7 +1038,7 @@ elseif($Step == 2)
 				'<input type="hidden" name="ReadBlockCurrent" value="'.$tar->ReadBlockCurrent.'">'.
 				'<input type="hidden" name="EncryptKey" value="'.htmlspecialcharsbx($tar->EncryptKey).'">'.
 				'<input type="hidden" name="DataSize" value="'.$DataSize.'">'.
-				'<input type="hidden" name="arc_name" value="'.$arc_name.'">';
+				'<input type="hidden" name="arc_name" value="'.htmlspecialcharsbx($arc_name).'">';
 	
 				if($r === false) // Error
 					showMsg(getMsg("ERR_EXTRACT", LANG), $status.$hidden.'<div style="color:red">'.$strErrMsg.'</div>', $bottom.$skip);
@@ -918,7 +1055,7 @@ elseif($Step == 2)
 			$text = ($tar->EncryptKey ? '<div style="color:red">'.getMsg('WRONG_PASS').'</div>' : '').
 			getMsg('FILE_IS_ENC').
 			'<input type="password" size=30 name="EncryptKey" autocomplete="off">'.
-			'<input type="hidden" name="arc_name" value="'.$arc_name.'">'.
+			'<input type="hidden" name="arc_name" value="'.htmlspecialcharsbx($arc_name).'">'.
 			'<input type="hidden" name="Step" value="2">';
 			$bottom .= ' <input type="button" id="start_button" value="'.getMsg("BUT_TEXT1", LANG).'" onClick="reloadPage(2, \''. LANG.'\')">';
 			showMsg(getMsg('TITLE_PROCESS1'),$text,$bottom);
@@ -929,25 +1066,43 @@ elseif($Step == 2)
 
 	if ($bClearUnusedStep)
 	{
-		if (file_exists(RESTORE_FILE_LIST))
+		if (file_exists(RESTORE_FILE_LIST) && $f = fopen(RESTORE_FILE_LIST, 'rb'))
 		{
-			include(RESTORE_FILE_LIST);
+			$modules = $_SERVER['DOCUMENT_ROOT'].'/bitrix/modules';
+			$components = $_SERVER['DOCUMENT_ROOT'].'/bitrix/components/bitrix';
+			fgets($f); // "die" line
+			$a = array();
+			while(false !== $l = fgets($f))
+				$a[trim($l)] = 1;
+			fclose($f);
+
 			$ds = new CDirRealScan;
 			$ds->startPath = $_REQUEST['nextPath'];
-			$res = $ds->Scan($_SERVER['DOCUMENT_ROOT'].'/bitrix/modules');
+			if (strpos($_REQUEST['nextPath'], $components) === 0)
+				$init_path = $components;
+			else
+				$init_path = $modules;
+			$res = $ds->Scan($init_path);
+
+			if ($res === true && $init_path == $modules)
+			{
+				$ds->nextPath = $components;
+				$res = 'BREAK';
+			}
 
 			if ($res === 'BREAK')
 			{
 				$status = getMsg("SEARCHING_UNUSED", LANG);
 				$hidden = '<input type="hidden" name="nextPath" value="'.$ds->nextPath.'">'.
 					'<input type="hidden" name="clear" value="1">'.GetHidden(array('dump_name', 'arc_name'));
-				$bottom = '<input type="button" value="'.getMsg('BUT_TEXT_BACK').'"  onClick="reloadPage(1, \''. LANG.'\')"> ';
+				$bottom = '<a href="javascript:reloadPage(1, \''. LANG.'\')">'.getMsg('BUT_TEXT_BACK').'</a> ';
 				showMsg(getMsg('TITLE_PROCESS1'),$status.$hidden,$bottom);
 				?><script>reloadPage(2, '<?= LANG?>', 1);</script><?
 				die();
 			}
 			unlink(RESTORE_FILE_LIST);
 		}
+
 		if (file_exists(RESTORE_FILE_DIR))
 			$strWarning.= '<li>'.getMsg('WARN_CLEARED');
 		if (file_exists($_SERVER['DOCUMENT_ROOT'].'/bitrix/backup/sites'))
@@ -959,9 +1114,10 @@ elseif($Step == 2)
 	{
 		$status = '<div style="color:red;text-align:center"><b>'.getMsg('WARNING').'</b></div> <ul style="color:red">'.$strWarning.'</ul>';
 		$hidden = '<input type="hidden" name="source" value="dump">'.GetHidden(array('dump_name', 'arc_name'));
-		$bottom = '<input type="button" value="'.getMsg('BUT_TEXT_BACK').'"  onClick="reloadPage(1, \''. LANG.'\')"> '.
+		$bottom = '<a href="javascript:reloadPage(1, \''. LANG.'\')">'.getMsg('BUT_TEXT_BACK').'</a> '.
 			'<input type="button" value="'.getMsg("BUT_TEXT1", LANG).'" onClick="reloadPage(2, \''. LANG.'\')">';
 		showMsg(getMsg('TITLE_PROCESS1'),$status.$hidden,$bottom);
+		die();
 	}
 
 	if ($bSelectDumpStep)
@@ -983,7 +1139,7 @@ elseif($Step == 2)
 					'TEXT' => '<div style="color:red">'.$strErrMsg.'</div>',
 					'BOTTOM' =>
 					'<input type="hidden" name="source" value="dump">'.GetHidden(array('dump_name', 'arc_name')).
-					'<input type="button" value="'.getMsg('BUT_TEXT_BACK').'"  onClick="reloadPage(1, \''. LANG.'\')"> '.
+					'<a href="javascript:reloadPage(1, \''. LANG.'\')">'.getMsg('BUT_TEXT_BACK').'</a> '.
 					'<input type="button" value="'.getMsg("DUMP_RETRY", LANG).'" onClick="reloadPage(2, \''. LANG.'\')"> '
 				);
 				html($ar);
@@ -1009,7 +1165,7 @@ elseif($Step == 2)
 				}
 				else
 				{
-					$DBHost = 'localhost'.(@file_exists($_SERVER['DOCUMENT_ROOT'].'/../BitrixEnv.exe') ? ':31006' : '');
+					$DBHost = 'localhost'.(file_exists($_SERVER['DOCUMENT_ROOT'].'/../BitrixEnv.exe') ? ':31006' : '');
 					$DBLogin = 'root';
 					$DBPassword = '';
 					$DBName = 'bitrix_'.(rand(11,99));
@@ -1036,15 +1192,15 @@ elseif($Step == 2)
 					'TITLE' => getMsg("TITLE2", LANG),
 					'TEXT' =>
 						($strWarning ? '<div style="color:red;text-align:center"><b>'.getMsg('WARNING').'</b></div> <ul style="color:red">'.$strWarning.'</ul>' : '').
-						'<input type="hidden" name="arc_name" value="'.$arc_name.'">'.
+						'<input type="hidden" name="arc_name" value="'.htmlspecialcharsbx($arc_name).'">'.
 						(count($arDName)>1 ? getMsg("DB_SELECT").' <select name="dump_name">'.$strDName.'</select>' : '<input type=hidden name=dump_name value="'.htmlspecialcharsbx($arDName[0]).'">').
 						'<div style="border:1px solid #aeb8d7;padding:5px;margin-top:4px;margin-bottom:4px;">
 						<div style="text-align:center;color:#aeb8d7;margin:4px"><b>'.getMsg("DB_SETTINGS", LANG).'</b></div>
-						<table width=100% cellspacing=0 cellpadding=2 border=0>
-						<tr><td align=right>'. getMsg("BASE_HOST", LANG).':</td><td><input autocomplete=off name="DBHost" value="'.htmlspecialcharsbx($DBHost).'"></td></tr>
-						<tr><td align=right>'. getMsg("USER_NAME", LANG).':</td><td><input autocomplete=off name="DBLogin" value="'.htmlspecialcharsbx($DBLogin).'"></td></tr>
+						<table width=100% cellspacing=0 cellpadding=2 border=0 class="content-table">
+						<tr><td align=right>'. getMsg("BASE_HOST", LANG).':</td><td><input autocomplete=off type="text" name="DBHost" value="'.htmlspecialcharsbx($DBHost).'"></td></tr>
+						<tr><td align=right>'. getMsg("USER_NAME", LANG).':</td><td><input autocomplete=off type="text" name="DBLogin" value="'.htmlspecialcharsbx($DBLogin).'"></td></tr>
 						<tr><td align=right>'. getMsg("USER_PASS", LANG).':</td><td><input type="password" autocomplete=off name="DBPassword" value="'.htmlspecialcharsbx($DBPassword).'"></td></tr>
-						<tr><td align=right>'. getMsg("BASE_NAME", LANG).':</td><td><input autocomplete=off name="DBName" value="'.htmlspecialcharsbx($DBName).'"></td></tr>
+						<tr><td align=right>'. getMsg("BASE_NAME", LANG).':</td><td><input autocomplete=off type="text" name="DBName" value="'.htmlspecialcharsbx($DBName).'"></td></tr>
 						<tr><td align=right>'. getMsg("BASE_CREATE_DB", LANG).'</td><td><input type="checkbox" name="create_db" value="Y" '.($create_db ? 'checked' : '').'></td></tr>
 						</table>
 						</div>'.
@@ -1061,9 +1217,9 @@ elseif($Step == 2)
 						)
 					,
 					'BOTTOM' =>
-					'<input type="button" value="'.getMsg('BUT_TEXT_BACK').'" onClick="document.location=\'/restore.php?Step=1&lang='.LANG.'\'"> '.
-					'<input type="button" value="'.getMsg("DB_SKIP", LANG).'" onClick="reloadPage(4, \''. LANG.'\')"> '.
-					'<input type="button" value="'.getMsg("BASE_RESTORE", LANG).'" onClick="reloadPage(3, \''. LANG.'\')">'
+					'<a style="padding: 0 13px;" href="/restore.php?Step=1&lang='.LANG.'">'.getMsg('BUT_TEXT_BACK').'</a> '.
+					'<input type="button" style="padding: 0 13px;" value="'.getMsg("DB_SKIP", LANG).'" onClick="reloadPage(4, \''. LANG.'\')"> '.
+					'<input type="button" style="padding: 0 13px;" value="'.getMsg("BASE_RESTORE", LANG).'" onClick="reloadPage(3, \''. LANG.'\')">'
 				);
 				html($ar);
 			}
@@ -1130,10 +1286,10 @@ elseif($Step == 3)
 			{
 				if (is_array($ar['connections']['value']['default']))
 				{
-					$ar['connections']['value']['default']['host'] = str_replace('$','\$',addslashes($_REQUEST['DBHost']));
-					$ar['connections']['value']['default']['database'] = str_replace('$','\$',addslashes($_REQUEST['DBName']));
-					$ar['connections']['value']['default']['login'] = str_replace('$','\$',addslashes($_REQUEST['DBLogin']));
-					$ar['connections']['value']['default']['password'] = str_replace('$','\$',addslashes($_REQUEST['DBPassword']));
+					$ar['connections']['value']['default']['host'] = $_REQUEST['DBHost'];
+					$ar['connections']['value']['default']['database'] = $_REQUEST['DBName'];
+					$ar['connections']['value']['default']['login'] = $_REQUEST['DBLogin'];
+					$ar['connections']['value']['default']['password'] = $_REQUEST['DBPassword'];
 					$data = var_export($ar, true);
 					file_put_contents($config, "<"."?php\nreturn ".$data.";\n");
 				}
@@ -1148,7 +1304,7 @@ elseif($Step == 3)
 	else
 		$r = $oDB->restore();
 
-	$bottom = '<input type="button" value="'.getMsg('BUT_TEXT_BACK').'" onClick="document.location=\'/restore.php?Step=2&source=dump&lang='.LANG.'\'"> ';
+	$bottom = '<a href="/restore.php?Step=2&lang='.LANG.'">'.getMsg('BUT_TEXT_BACK').'</a> ';
 	if($r && !$oDB->is_end())
 	{
 		$d_pos = $oDB->getPos();
@@ -1182,10 +1338,16 @@ elseif($Step == 3)
 		if($oDB->getError() != "")
 			showMsg(getMsg("ERR_DUMP_RESTORE", LANG), '<div style="color:red">'.$oDB->getError().'</div>', $bottom);
 		else
+		{
+			if (!$oDB->ft_index)
+			{
+				$oDB->Query('UPDATE b_option SET VALUE="'.$oDB->escapeString(serialize(array())).'" WHERE MODULE_ID="main" AND NAME LIKE "~ft_%"');
+			}
 			showMsg(getMsg('FINISH'),GetHidden(array('DBLogin','DBPassword','DBHost','DBName','dump_name', 'arc_name', 'check_site_path')).'<script>reloadPage(4, \''.LANG.'\');</script>');
+		}
 	}
 }
-elseif($Step == 4) // последний экран: удалять или нет? 
+elseif($Step == 4)
 {
 	$strWarning .= CheckHtaccessAndWarn();
 
@@ -1194,9 +1356,9 @@ elseif($Step == 4) // последний экран: удалять или нет?
 		$oDB = new CDBRestore($_REQUEST["DBHost"], $_REQUEST["DBName"], $_REQUEST["DBLogin"], $_REQUEST["DBPassword"], $_REQUEST["dump_name"], $d_pos);
 		if ($oDB->Connect())
 		{
-			if ($rs = $oDB->Query('SELECT * FROM b_lang WHERE DOC_ROOT != "'.mysql_real_escape_string($_SERVER['DOCUMENT_ROOT']).'" AND DOC_ROOT IS NOT NULL AND DOC_ROOT != ""'))
+			if ($rs = $oDB->Query('SELECT * FROM b_lang WHERE DOC_ROOT != "'.$oDB->escapeString($_SERVER['DOCUMENT_ROOT']).'" AND DOC_ROOT IS NOT NULL AND DOC_ROOT != ""'))
 			{
-				if (mysql_fetch_assoc($rs))
+				if ($oDB->Fetch($rs))
 				{
 					$oDB->Query('UPDATE b_lang SET DOC_ROOT = "" ');
 					$strWarning .= '<li>'.getMsg('DOC_ROOT_WARN');
@@ -1204,15 +1366,16 @@ elseif($Step == 4) // последний экран: удалять или нет?
 			}
 
 			$rs = $oDB->Query('SHOW TABLES LIKE "b_bitrixcloud_option"');
-			if (mysql_fetch_assoc($rs))
+			if ($oDB->Fetch($rs))
 			{
 				$rs = $oDB->Query('SELECT * FROM b_bitrixcloud_option WHERE NAME="cdn_config_active" AND PARAM_VALUE=1');
-				if (mysql_fetch_assoc($rs))
+				if ($oDB->Fetch($rs))
 				{
 					$rs = $oDB->Query('SELECT * FROM b_bitrixcloud_option WHERE NAME="cdn_config_domain"');
-					if (($f = mysql_fetch_assoc($rs)) && $f['PARAM_VALUE'] != $_SERVER['HTTP_HOST'])
+					if (($f = $oDB->Fetch($rs)) && $f['PARAM_VALUE'] != $_SERVER['HTTP_HOST'])
 					{
 						$oDB->Query('UPDATE b_bitrixcloud_option SET PARAM_VALUE=0 WHERE NAME="cdn_config_active"');
+						$oDB->Query('UPDATE b_bitrixcloud_option SET PARAM_VALUE='.(time() + 86400 * 3650).' WHERE NAME="cdn_config_expire_time"');
 						$strWarning .= '<li>'.getMsg('CDN_WARN');
 					}
 				}
@@ -1220,10 +1383,10 @@ elseif($Step == 4) // последний экран: удалять или нет?
 
 			if ($rs = $oDB->Query('SELECT * FROM b_module_to_module WHERE FROM_MODULE_ID="main" AND MESSAGE_ID="OnPageStart" AND TO_CLASS="Bitrix\\\\Security\\\\HostRestriction"'))
 			{
-				if ($f = mysql_fetch_assoc($rs)) // host restriction is turned on
+				if ($f = $oDB->Fetch($rs)) // host restriction is turned on
 				{
 					$rs0 = $oDB->Query('SELECT * FROM b_option WHERE MODULE_ID="security" AND NAME="restriction_hosts_hosts"');
-					if ($f0 = mysql_fetch_assoc($rs0))
+					if ($f0 = $oDB->Fetch($rs0))
 					{
 						if (strpos($f0['VALUE'], $_SERVER['HTTP_HOST']) === false)
 						{
@@ -1236,14 +1399,14 @@ elseif($Step == 4) // последний экран: удалять или нет?
 
 		}
 		else
-			$strWarning .= '<li>Mysql Error: '.mysql_error();
+			$strWarning .= '<li>'.$oDB->getError();
 	}
 
 	$text = 
 	($strWarning ? '<div style="color:red;padding:10px;text-align:center"><b>'.getMsg('WARNING').'</b></div> <ul style="color:red">'.$strWarning.'</ul>' : '').
 	getMsg("FINISH_MSG", LANG).GetHidden(array('dump_name', 'arc_name'));
-	$bottom = '<input type="button" value="'.getMsg('BUT_TEXT_BACK').'" onClick="document.location=\'/restore.php?Step=2&source=dump&lang='.LANG.'\'"> '.
-		'<input type=button value="'.getMsg('DELETE_FILES').'" onClick="reloadPage(5)">';
+	$bottom = '<a style="padding:0 13px;font-size:13px;" href="/restore.php?Step=2&source=dump&lang='.LANG.'">'.getMsg('BUT_TEXT_BACK').'</a> '.
+		'<input type=button style="padding:0 13px;font-size:13px;" value="'.getMsg('DELETE_FILES').'" onClick="reloadPage(5)">';
 	showMsg(getMsg("FINISH", LANG), $text, $bottom);
 }
 elseif($Step == 5)
@@ -1266,7 +1429,7 @@ elseif($Step == 5)
 	}
 
 	foreach(array('cache','stack_cache','managed_cache') as $dir)
-		@DeleteDirRec($_SERVER['DOCUMENT_ROOT'].'/bitrix/'.$dir);
+		DeleteDirRec($_SERVER['DOCUMENT_ROOT'].'/bitrix/'.$dir);
 
 	if (!$ok)
 		showMsg(getMsg("FINISH_ERR_DELL_TITLE", LANG), getMsg("FINISH_ERR_DELL", LANG));
@@ -1278,9 +1441,6 @@ elseif($Step == 5)
 }
 
 #################### END ############
-
-
-
 
 class CDBRestore
 {
@@ -1296,14 +1456,9 @@ class CDBRestore
 	var $start;
 	var $d_pos;
 	var $_dFile;
+	var $mysqli;
 
-
-	function Query($sql)
-	{
-		return mysql_query($sql, $this->db_Conn);
-	}
-
-	function CDBRestore($DBHost, $DBName, $DBLogin, $DBPassword, $DBdump, $d_pos)
+	public function __construct($DBHost, $DBName, $DBLogin, $DBPassword, $DBdump, $d_pos)
 	{
 		$this->DBHost = $DBHost;
 		$this->DBLogin = $DBLogin;
@@ -1311,48 +1466,63 @@ class CDBRestore
 		$this->DBName = $DBName;
 		$this->DBdump = $_SERVER["DOCUMENT_ROOT"]."/bitrix/backup/".$DBdump;
 		$this->d_pos = $d_pos;
+		$this->mysqli = function_exists('mysqli_connect');
+		$this->ft_index = null;
 	}
 
-	//Соединяется с базой данных
+	function Query($sql)
+	{
+		if ($this->ft_index === false && preg_match("#^CREATE TABLE.*FULLTEXT KEY#ms", $sql))
+		{
+			$sql = preg_replace("#[\r\n\s]*FULLTEXT KEY[^\r\n]*[\r\n]*#m", "", $sql);
+			$sql = str_replace("),)", "))", $sql);
+		}
+
+		$rs = $this->mysqli ? mysqli_query($this->db_Conn, $sql) : mysql_query($sql, $this->db_Conn);
+		if ($this->ft_index == null)
+		{
+			if (preg_match("#^CREATE TABLE.*FULLTEXT KEY#ms", $sql))
+			{
+				$this->ft_index = (bool) $rs;
+				return $rs ? $rs : $this->Query($sql);
+			}
+		}
+
+		if (!$rs)
+		{
+			$this->db_Error = "<font color=#ff0000>MySQL query error!</font><br>".($this->mysqli ? mysqli_error($this->db_Conn) : mysql_error()).'<br><br>'.htmlspecialcharsbx($sql);
+			return false;
+		}
+		return $rs;
+	}
+
 	function Connect()
 	{
-
-		$this->type="MYSQL";
-		if (!defined("DBPersistent")) define("DBPersistent",false);
-		if (DBPersistent)
+		$this->db_Conn = $this->mysqli ? @mysqli_connect($this->DBHost, $this->DBLogin, $this->DBPassword) : @mysql_connect($this->DBHost, $this->DBLogin, $this->DBPassword);
+		if (!$this->db_Conn)
 		{
-			$this->db_Conn = @mysql_pconnect($this->DBHost, $this->DBLogin, $this->DBPassword);
-		}
-		else
-		{
-			$this->db_Conn = @mysql_connect($this->DBHost, $this->DBLogin, $this->DBPassword);
-		}
-
-		if(!($this->db_Conn))
-		{
-			if (DBPersistent) $s = "mysql_pconnect"; else $s = "mysql_connect";
-			if(($str_err = mysql_error()) != "")
-				$this->db_Error .= "<br><font color=#ff0000>Error! ".$s."('-', '-', '-')</font><br>".$str_err."<br>";
+			$this->db_Error = "<font color=#ff0000>MySQL connect error!</font><br>".($this->mysqli ? mysqli_connect_error() : mysql_error()).'<br>';
 			return false;
 		}
 
-		mysql_query('SET FOREIGN_KEY_CHECKS = 0', $this->db_Conn);
+		$this->Query('SET FOREIGN_KEY_CHECKS = 0');
 
-		if(!@mysql_select_db($this->DBName, $this->db_Conn))
+		$dbExists = $this->mysqli ? @mysqli_select_db($this->db_Conn, $this->DBName) : @mysql_select_db($this->DBName, $this->db_Conn);
+		if(!$dbExists)
 		{
 			if (@$_REQUEST["create_db"]=="Y")
 			{
-				if(!@mysql_query("CREATE DATABASE `".mysql_real_escape_string($this->DBName)."`", $this->db_Conn))
+				if(!@$this->Query("CREATE DATABASE `".$this->escapeString($this->DBName)."`"))
 				{
-					$this->db_Error = getMsg("ERR_CREATE_DB", LANG).': '.mysql_error();
+					$this->db_Error = getMsg("ERR_CREATE_DB", LANG).': '.($this->mysqli ? mysqli_error($this->db_Conn) : mysql_error());
 					return false;
 				}
-				@mysql_select_db($this->DBName, $this->db_Conn);
+				$dbExists = $this->mysqli ? @mysqli_select_db($this->db_Conn, $this->DBName) : @mysql_select_db($this->DBName, $this->db_Conn);
 			}
 
-			if(($str_err = mysql_error($this->db_Conn)) != "")
+			if(!$dbExists)
 			{
-				$this->db_Error = "<font color=#ff0000>Error! mysql_select_db($this->DBName)</font><br>".$str_err."<br>";
+				$this->db_Error = "<font color=#ff0000>Error! mysql".($this->mysqli ? 'i' : '')."_select_db(".htmlspecialcharsbx($this->DBName).")</font><br>".($this->mysqli ? mysqli_error($this->db_Conn) : mysql_error())."<br>";
 				return false;
 			}
 		}
@@ -1364,11 +1534,22 @@ class CDBRestore
 			foreach($arSql as $sql)
 			{
 				$sql = str_replace('<DATABASE>', $this->DBName, $sql);
-				mysql_query($sql, $this->db_Conn);
+				if (trim($sql))
+					$this->Query($sql);
 			}
 		}
 
 		return true;
+	}
+	
+	function Fetch($rs)
+	{
+		return $this->mysqli ? mysqli_fetch_assoc($rs) : mysql_fetch_assoc($rs);
+	}
+
+	function escapeString($str)
+	{
+		return $this->mysqli ? mysqli_real_escape_string($this->db_Conn, $str) : mysql_real_escape_string($str, $this->db_Conn);
 	}
 
 	function readSql()
@@ -1427,7 +1608,7 @@ class CDBRestore
 
 		while(($sql = $this->readSql()) && haveTime())
 		{
-			if (defined('VMBITRIX')) // избавимся от MyISAM
+			if (defined('VMBITRIX'))
 			{
 				if (preg_match('#^CREATE TABLE#i',$sql))
 				{
@@ -1436,26 +1617,18 @@ class CDBRestore
 				}
 			}
 
-			$result = @mysql_query($sql, $this->db_Conn);
+			$rs = @$this->Query($sql);
 
-			if(!$result && mysql_errno() != 1062)
-			{
-				$this->db_Error .= mysql_error().'<br><br>'.htmlspecialcharsbx($sql);
+			if(!$rs && ($this->mysqli ? mysqli_errno($this->db_Conn) : mysql_errno()) != 1062)
 				return false;
-			}
 			$sql = "";
 		}
-		mysql_query('SET FOREIGN_KEY_CHECKS = 1', $this->db_Conn);
+		$this->Query('SET FOREIGN_KEY_CHECKS = 1');
 
 		if($sql != "")
 		{
-			$result = @mysql_query($sql, $this->db_Conn);
-
-			if(!$result)
-			{
-				$this->db_Error .= mysql_error().'<br><br>'.htmlspecialcharsbx($sql);
+			if(!$this->Query($sql))
 				return false;
-			}
 			$sql = "";
 		}
 
@@ -1472,7 +1645,7 @@ class CDBRestore
 				foreach($arFiles as $file)
 				{
 					if ($id = intval($file))
-						mysql_query('UPDATE b_file SET SUBDIR = CONCAT("'.$name.'/'.$id.'/", SUBDIR), HANDLER_ID=NULL WHERE HANDLER_ID ='.$id);
+						$this->Query('UPDATE b_file SET SUBDIR = CONCAT("'.$name.'/'.$id.'/", SUBDIR), HANDLER_ID=NULL WHERE HANDLER_ID ='.$id);
 				}
 			}
 		}
@@ -1559,9 +1732,11 @@ function getDumpList()
 
 function getMsg($str_index, $str_lang='')
 {
-	global $mArr_ru, $mArr_en;
+	global $mArr_ru, $mArr_en, $mArr_de;
 	if(LANG == "ru")
 		return $mArr_ru[$str_index];
+	if(LANG == "de")
+		return $mArr_de[$str_index];
 	else
 		return $mArr_en[$str_index];
 }
@@ -1606,72 +1781,577 @@ function showMsg($title, $msg, $bottom='')
 
 function html($ar)
 {
+	$isCrm = getenv('BITRIX_ENV_TYPE') == 'crm';
 ?>
 	<html>
 	<head>
 	<title><?=$ar['TITLE']?></title>
 	</head>
-	<body style="background:#4A507B">
+	<body>
 	<style>
-		td {font-family:Verdana;font-size:9pt}
+		html, body {
+			padding: 0 10px;
+			margin: 0;
+			background: #2fc6f7;
+			position: relative;
+		}
+		p {
+			margin: 0 0 40px;
+			font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+			font-size:13px;
+		}
+		.wrap {
+			min-height: 100vh;
+			position: relative;
+		}
+
+		.cloud {
+			background-size: contain;
+			position: absolute;
+			z-index: 1;
+			background-repeat: no-repeat;
+			background-position: center;
+			opacity: .8;
+		}
+
+		.cloud-fill {
+			background-image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDEiIGhlaWdodD0iNjMiIHZpZXdCb3g9IjAgMCAxMDEgNjMiPiAgPHBhdGggZmlsbD0iI0U0RjhGRSIgZmlsbC1ydWxlPSJldmVub2RkIiBkPSJNNDc3LjM5MjY1MywyMTEuMTk3NTYyIEM0NzYuNDcwMzYyLDIwMS41NDc2MjIgNDY4LjM0NDA5NywxOTQgNDU4LjQ1MjIxNCwxOTQgQzQ1MC44MTI2NzksMTk0IDQ0NC4yMjc3NzcsMTk4LjUwNDA2MyA0NDEuMTk5MDYzLDIwNC45OTk1NzkgQzQzOS4xNjkwNzYsMjA0LjI2MTQzMSA0MzYuOTc4NjM2LDIwMy44NTc3NzEgNDM0LjY5MzQzOSwyMDMuODU3NzcxIEM0MjQuMTgzMTE2LDIwMy44NTc3NzEgNDE1LjY2Mjk4MywyMTIuMzc3NTg4IDQxNS42NjI5ODMsMjIyLjg4NzkxMSBDNDE1LjY2Mjk4MywyMjMuMzg1MDY0IDQxNS42ODc5MzUsMjIzLjg3NjIxNSA0MTUuNzI1MjA2LDIyNC4zNjM4OTIgQzQxNC40NjU1ODUsMjI0LjA0OTYxOCA0MTMuMTQ4NDc4LDIyMy44ODA2MzcgNDExLjc5MTU3MywyMjMuODgwNjM3IEM0MDIuODMxNzczLDIyMy44ODA2MzcgMzk1LjU2ODczNCwyMzEuMTQzNjc2IDM5NS41Njg3MzQsMjQwLjEwMzQ3NiBDMzk1LjU2ODczNCwyNDkuMDYyOTYxIDQwMi44MzE3NzMsMjU2LjMyNiA0MTEuNzkxNTczLDI1Ni4zMjYgTDQ3Mi4zMTg0NzUsMjU2LjMyNiBDNDg0LjkzODM4LDI1Ni4zMjYgNDk1LjE2ODU0MSwyNDYuMDk1MjA3IDQ5NS4xNjg1NDEsMjMzLjQ3NTYxOCBDNDk1LjE2ODU0MSwyMjIuNjAwNDg1IDQ4Ny41Njk0MzUsMjEzLjUwNjQ0NyA0NzcuMzkyNjUzLDIxMS4xOTc1NjIiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0zOTUgLTE5NCkiIG9wYWNpdHk9Ii41Ii8+PC9zdmc+);
+		}
+
+		.cloud-border {
+			background-image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxODUiIGhlaWdodD0iMTE3IiB2aWV3Qm94PSIwIDAgMTg1IDExNyI+ICA8cGF0aCBmaWxsPSJub25lIiBzdHJva2U9IiNFNEY4RkUiIHN0cm9rZS13aWR0aD0iMyIgZD0iTTEwODIuNjk2MzcsNTI5LjI1MjY1NyBDMTA4MS4wMjAzMSw1MTEuNzE2MDg3IDEwNjYuMjUyNjcsNDk4IDEwNDguMjc2NDMsNDk4IEMxMDM0LjM5MzMxLDQ5OCAxMDIyLjQyNjc0LDUwNi4xODUxMSAxMDE2LjkyMjc1LDUxNy45ODkyMzQgQzEwMTMuMjMzNzEsNTE2LjY0NzgxNyAxMDA5LjI1MzA4LDUxNS45MTQyNTcgMTAwNS4xMDAyNSw1MTUuOTE0MjU3IEM5ODYuMDAwMTMzLDUxNS45MTQyNTcgOTcwLjUxNjcyOCw1MzEuMzk3MDg4IDk3MC41MTY3MjgsNTUwLjQ5NzIwOSBDOTcwLjUxNjcyOCw1NTEuNDAwNjcxIDk3MC41NjIwNzMsNTUyLjI5MzIyNyA5NzAuNjI5ODA0LDU1My4xNzk0NjkgQzk2OC4zNDA3MjksNTUyLjYwODM0OCA5NjUuOTQ3MTg2LDU1Mi4zMDEyNjMgOTYzLjQ4MTMyMiw1NTIuMzAxMjYzIEM5NDcuMTk4OTIxLDU1Mi4zMDEyNjMgOTM0LDU2NS41MDAxODQgOTM0LDU4MS43ODI1ODQgQzkzNCw1OTguMDY0NDExIDk0Ny4xOTg5MjEsNjExLjI2MzMzMiA5NjMuNDgxMzIyLDYxMS4yNjMzMzIgTDEwNzMuNDc1Miw2MTEuMjYzMzMyIEMxMDk2LjQwOTAxLDYxMS4yNjMzMzIgMTExNSw1OTIuNjcxMTkyIDExMTUsNTY5LjczNzk1OSBDMTExNSw1NDkuOTc0ODc4IDExMDEuMTkwMzUsNTMzLjQ0ODUzMSAxMDgyLjY5NjM3LDUyOS4yNTI2NTciIHRyYW5zZm9ybT0idHJhbnNsYXRlKC05MzIgLTQ5NikiIG9wYWNpdHk9Ii41Ii8+PC9zdmc+);
+		}
+
+		.cloud-1 {
+			top: 9%;
+			left: 50%;
+			width: 60px;
+			height: 38px;
+		}
+
+		.cloud-2 {
+			top: 14%;
+			left: 12%;
+			width: 80px;
+			height: 51px;
+		}
+
+		.cloud-3 {
+			top: 11%;
+			right: 14%;
+			width: 106px;
+			height: 67px;
+		}
+
+		.cloud-4 {
+			top: 33%;
+			right: 13%;
+			width: 80px;
+			height: 51px;
+		}
+
+		.cloud-5 {
+			bottom: 23%;
+			right: 12%;
+			width: 80px;
+			height: 51px;
+		}
+
+		.cloud-6 {
+			bottom: 23%;
+			left: 12%;
+			width: 80px;
+			height: 51px;
+		}
+
+		.cloud-7 {
+			top: 13%;
+			left: 6%;
+			width: 60px;
+			height: 31px;
+			opacity: 1;
+		}
+
+		.cloud-8 {
+			top: 43%;
+			right: 6%;
+			width: 86px;
+			height: 54px;
+			opacity: 1;
+		}
+
+		.header {
+			min-height: 220px;
+			max-width: 727px;
+			margin: 0 auto;
+			box-sizing: border-box;
+			position: relative;
+			z-index: 10;
+		}
+
+		.logo-link,
+		.buslogo-link{
+			position: absolute;
+			top: 50%;
+			margin-top: -23px;
+		}
+
+		.logo {
+			width: 255px;
+			display: block;
+			height: 46px;
+			background-repeat: no-repeat;
+			/*background-size:cover;*/
+		}
+
+		.wrap.en .logo,
+		.wrap.de .logo { background-image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxODUiIGhlaWdodD0iMzYiIHZpZXdCb3g9IjAgMCAxODUgMzYiPiAgPGcgZmlsbD0ibm9uZSIgZmlsbC1ydWxlPSJldmVub2RkIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtLjAxMyAuMDIyKSI+ICAgIDxnIGZpbGw9IiNGRkZGRkYiIGZpbGwtcnVsZT0ibm9uemVybyIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMCAxLjcwMSkiPiAgICAgIDxwYXRoIGQ9Ik0uNDg1MTExMDIzIDIuNjA5MTUwMDdMMTAuMjI4MTI5NCAyLjYwOTE1MDA3QzE2Ljk2MDY2NDYgMi42MDkxNTAwNyAxOS45NzExNDc4IDYuNDQyNDE2NyAxOS45NzExNDc4IDEwLjMyMDU2OTQgMTkuOTcxMTQ3OCAxMi44MTYyMzI0IDE4LjcwMzA5NTggMTUuMjU4MDMyMiAxNi4zMDM4MzE5IDE2LjQ2MDk3NzdMMTYuMzAzODMxOSAxNi41NTA3NDk4QzIwLjAyNTg4MzkgMTcuNTIwMjg4IDIyLjA5NjczMTQgMjAuNDczNzg4NSAyMi4wOTY3MzE0IDIzLjg5NDEwMzcgMjIuMDk2NzMxNCAyOC41MDgzODcyIDE4LjQyOTQxNTUgMzMuMDMyODk4NiAxMS4wODU2NjEgMzMuMDMyODk4NkwuNDk0MjMzNjk5IDMzLjAzMjg5ODYuNDk0MjMzNjk5IDIuNjA5MTUwMDcuNDg1MTExMDIzIDIuNjA5MTUwMDd6TTkuMzc5NzIwNSAxNS4wMjQ2MjQ5QzEyLjIwNzc1MDIgMTUuMDI0NjI0OSAxMy42NTgyNTU3IDEzLjQ1MzYxNCAxMy42NTgyNTU3IDExLjQ2OTY1MTYgMTMuNjU4MjU1NyA5LjM5NTkxNzIzIDEyLjI0NDI0MDkgNy43ODAwMjAyOCA5LjIzMzc1NzY4IDcuNzgwMDIwMjhMNi45MjU3MjA1NSA3Ljc4MDAyMDI4IDYuOTI1NzIwNTUgMTUuMDI0NjI0OSA5LjM3OTcyMDUgMTUuMDI0NjI0OXpNMTAuMjI4MTI5NCAyNy44NTMwNTEyQzEzLjgwNDIxODYgMjcuODUzMDUxMiAxNS41OTIyNjMxIDI2LjY1MDEwNTcgMTUuNTkyMjYzMSAyMy44ODUxMjY1IDE1LjU5MjI2MzEgMjEuNTMzMDk4NyAxMy44MDQyMTg2IDIwLjE5NTQ5NTEgMTAuODM5MzQ4NyAyMC4xOTU0OTUxTDYuOTI1NzIwNTUgMjAuMTk1NDk1MSA2LjkyNTcyMDU1IDI3Ljg2MjAyODQgMTAuMjI4MTI5NCAyNy44NjIwMjg0IDEwLjIyODEyOTQgMjcuODUzMDUxMnpNMjUuMjM0OTMyMSA0LjQ0OTQ3NzE0QzI1LjIzNDkzMjEgMi40NjU1MTQ3OSAyNi44ODYxMzY1Ljg0OTYxNzg0NiAyOS4wOTM4MjQyLjg0OTYxNzg0NiAzMS4yNTU4OTg1Ljg0OTYxNzg0NiAzMi45MDcxMDI5IDIuMzc1NzQyNzQgMzIuOTA3MTAyOSA0LjQ0OTQ3NzE0IDMyLjkwNzEwMjkgNi40NzgzMjU1MyAzMS4yNTU4OTg1IDguMTM5MTA4NDkgMjkuMDkzODI0MiA4LjEzOTEwODQ5IDI2Ljg4NjEzNjUgOC4xNDgwODU3IDI1LjIzNDkzMjEgNi41MzIxODg3NiAyNS4yMzQ5MzIxIDQuNDQ5NDc3MTR6TTI1Ljg5MTc2NDggMTEuMTkxMzU4M0wzMi4yNDExNDc1IDExLjE5MTM1ODMgMzIuMjQxMTQ3NSAzMy4wMjM5MjE0IDI1Ljg5MTc2NDggMzMuMDIzOTIxNCAyNS44OTE3NjQ4IDExLjE5MTM1ODN6TTM4Ljc5MTIyOTIgMjcuMzUwMzI3N0wzOC43OTEyMjkyIDE2LjAzOTA0OTEgMzQuNjk1MTQ3NSAxNi4wMzkwNDkxIDM0LjY5NTE0NzUgMTEuMTkxMzU4MyAzOC43OTEyMjkyIDExLjE5MTM1ODMgMzguNzkxMjI5MiA2LjA2NTM3NDA4IDQ1LjE5NTM0OCA0LjI2MDk1NTgzIDQ1LjE5NTM0OCAxMS4xODIzODExIDUxLjkyNzg4MzIgMTEuMTgyMzgxMSA1MC40NjgyNTUgMTYuMDMwMDcxOSA0NS4xOTUzNDggMTYuMDMwMDcxOSA0NS4xOTUzNDggMjUuNzcwMzM5NkM0NS4xOTUzNDggMjcuNzk5MTg3OSA0NS44NTIxODA3IDI4LjQ5MDQzMjcgNDcuMzExODA4OSAyOC40OTA0MzI3IDQ4LjUzNDI0NzYgMjguNDkwNDMyNyA0OS43NTY2ODYyIDI4LjA3NzQ4MTMgNTAuNjA1MDk1MSAyNy41MjA4OTQ2TDUyLjQzODc1MzEgMzEuNzY3MTEyN0M1MC43ODc1NDg2IDMyLjg3MTMwODkgNDcuODc3NDE0OSAzMy40NzI3ODE3IDQ1LjY2MDYwNDUgMzMuNDcyNzgxNyA0MS40Mjc2ODI3IDMzLjQ5MDczNjEgMzguNzkxMjI5MiAzMS4xODM1OTQzIDM4Ljc5MTIyOTIgMjcuMzUwMzI3N3pNNTQuNjU1NTYzNCAxMS4xOTEzNTgzTDYwLjAxOTY5NzEgMTEuMTkxMzU4MyA2MC43MjIxNDMyIDEzLjQ5ODVDNjIuNjAxNDE0NiAxMS43OTI4MzEgNjQuMzg5NDU5MSAxMC42MzQ3NzE1IDY2Ljc5Nzg0NTcgMTAuNjM0NzcxNSA2Ny44ODM0NDQyIDEwLjYzNDc3MTUgNjkuMTk3MTA5NiAxMC45NTc5NTA5IDcwLjE4MjM1ODYgMTEuNjQ5MTk1N0w2Ny45NzQ2NzEgMTYuODIwMDY2QzY2Ljg0MzQ1OTEgMTYuMTI4ODIxMSA2NS43NjY5ODMzIDE1Ljk4NTE4NTkgNjUuMTQ2NjQxMyAxNS45ODUxODU5IDYzLjc3ODIzOTggMTUuOTg1MTg1OSA2Mi43MDE3NjQgMTYuNDQzMDIzMyA2MS4wMDQ5NDYyIDE3Ljc4OTYwNDFMNjEuMDA0OTQ2MiAzMy4wMjM5MjE0IDU0LjY1NTU2MzQgMzMuMDIzOTIxNCA1NC42NTU1NjM0IDExLjE5MTM1ODMgNTQuNjU1NTYzNCAxMS4xOTEzNTgzek03MS4yMjIzNDM4IDQuNDQ5NDc3MTRDNzEuMjIyMzQzOCAyLjQ2NTUxNDc5IDcyLjg3MzU0ODIuODQ5NjE3ODQ2IDc1LjA4MTIzNTkuODQ5NjE3ODQ2IDc3LjI0MzMxMDIuODQ5NjE3ODQ2IDc4Ljg5NDUxNDYgMi4zNzU3NDI3NCA3OC44OTQ1MTQ2IDQuNDQ5NDc3MTQgNzguODk0NTE0NiA2LjQ3ODMyNTUzIDc3LjI0MzMxMDIgOC4xMzkxMDg0OSA3NS4wODEyMzU5IDguMTM5MTA4NDkgNzIuODY0NDI1NSA4LjE0ODA4NTcgNzEuMjIyMzQzOCA2LjUzMjE4ODc2IDcxLjIyMjM0MzggNC40NDk0NzcxNHpNNzEuODc5MTc2NSAxMS4xOTEzNTgzTDc4LjIyODU1OTIgMTEuMTkxMzU4MyA3OC4yMjg1NTkyIDMzLjAyMzkyMTQgNzEuODc5MTc2NSAzMy4wMjM5MjE0IDcxLjg3OTE3NjUgMTEuMTkxMzU4M3oiLz4gICAgICA8cG9seWdvbiBwb2ludHM9Ijg4LjcyOSAyMi4wMzYgODAuNTkxIDExLjE5MSA4Ny4xNzggMTEuMTkxIDkyLjE2OCAxNy44MzQgOTcuMTU4IDExLjE5MSAxMDMuNzQ1IDExLjE5MSA5NS41MDcgMjIuMDM2IDEwMy44MzYgMzMuMDI0IDk3LjI0IDMzLjAyNCA5Mi4xMTMgMjYuMTkyIDg2Ljk0MSAzMy4wMjQgODAuMzU0IDMzLjAyNCIvPiAgICA8L2c+ICAgIDxwYXRoIGZpbGw9IiMyMTVGOTgiIGZpbGwtcnVsZT0ibm9uemVybyIgZD0iTTEyMi41MjgyNzYsMTIuMDg0NTYzNCBDMTIyLjUyODI3Niw5LjM2NDQ3MDI0IDEyMC4yMzg0ODQsOC40MDM5MDkyOCAxMTcuODAyNzI5LDguNDAzOTA5MjggQzExNC41MzY4MTEsOC40MDM5MDkyOCAxMTEuODYzODY3LDkuNDU0MjQyMjkgMTA5LjM4MjQ5OSwxMC41NDk0NjEzIEwxMDcuNjc2NTU5LDUuNTMxMjAzNjEgQzExMC40NDk4NTIsNC4yOTIzNDkyOCAxMTQuMjk5NjIyLDIuOTAwODgyNDcgMTE4Ljg3OTIwNSwyLjkwMDg4MjQ3IEMxMjYuMDQwNTA2LDIuOTAwODgyNDcgMTI5LjQ5ODAwMSw2LjQzNzkwMTMzIDEyOS40OTgwMDEsMTEuNDAyMjk1OCBDMTI5LjQ5ODAwMSwyMC4wOTIyMzA1IDExNy4zMjgzNSwyMi41MzQwMzAzIDExNS4yNzU3NDgsMjkuMTY4MTg1IEwxMjkuOTM1ODg5LDI5LjE2ODE4NSBMMTI5LjkzNTg4OSwzNC43MDcxMjA2IEwxMDYuNjA5MjA1LDM0LjcwNzEyMDYgQzEwNy45MjI4NzEsMTkuMjAzNDg3MiAxMjIuNTI4Mjc2LDE4LjI5Njc4OTQgMTIyLjUyODI3NiwxMi4wODQ1NjM0IFoiLz4gICAgPHBhdGggZmlsbD0iIzIxNUY5OCIgZmlsbC1ydWxlPSJub256ZXJvIiBkPSJNMTI5LjI3OTA1NiwyMy4wNzI2NjI2IEwxNDUuMzQ0MDg5LDMuMDE3NTg2MTQgTDE1MC4xMTUyNDksMy4wMTc1ODYxNCBMMTUwLjExNTI0OSwyMS45Nzc0NDM2IEwxNTQuODg2NDA5LDIxLjk3NzQ0MzYgTDE1NC44ODY0MDksMjcuMjI5MTA4NiBMMTUwLjExNTI0OSwyNy4yMjkxMDg2IEwxNTAuMTE1MjQ5LDM0LjcyNTA3NSBMMTQzLjYzODE0OSwzNC43MjUwNzUgTDE0My42MzgxNDksMjcuMjI5MTA4NiBMMTI5LjI2OTkzNCwyNy4yMjkxMDg2IEwxMjkuMjY5OTM0LDIzLjA3MjY2MjYgTDEyOS4yNzkwNTYsMjMuMDcyNjYyNiBaIE0xNDAuNzE4ODkyLDIxLjk3NzQ0MzYgTDE0My42MzgxNDksMjEuOTc3NDQzNiBMMTQzLjYzODE0OSwxOC41ODQwNiBDMTQzLjYzODE0OSwxNi4xNTEyMzc0IDE0My44Mjk3MjUsMTMuMzMyMzk1IDE0My45MzAwNzUsMTIuNzEyOTY3OCBMMTM2LjY3NzU0NywyMi4xMjEwNzg5IEMxMzcuMjYxMzk4LDIyLjA2NzIxNTYgMTM5LjU5NjgwMywyMS45Nzc0NDM2IDE0MC43MTg4OTIsMjEuOTc3NDQzNiBaIi8+ICAgIDxwYXRoIGZpbGw9IiMwMDY2QTEiIGQ9Ik0xNzIuOTU4NDMxLDAuMzYwMzMzMzkzIEMxNjYuNTU0MzEyLDAuMzYwMzMzMzkzIDE2MS4zNzI2MzIsNS40NjgzNjMxNyAxNjEuMzcyNjMyLDExLjc2MTM4NCBDMTYxLjM3MjYzMiwxOC4wNTQ0MDQ5IDE2Ni41NjM0MzUsMjMuMTYyNDM0NyAxNzIuOTU4NDMxLDIzLjE2MjQzNDcgQzE3OS4zNjI1NSwyMy4xNjI0MzQ3IDE4NC41NDQyMywxOC4wNTQ0MDQ5IDE4NC41NDQyMywxMS43NjEzODQgQzE4NC41NDQyMyw1LjQ2ODM2MzE3IDE3OS4zNTM0MjcsMC4zNjAzMzMzOTMgMTcyLjk1ODQzMSwwLjM2MDMzMzM5MyBaIE0xNzMuMDA0MDQ0LDIwLjg2NDI3MDEgQzE2Ny45MDQ0NjgsMjAuODY0MjcwMSAxNjMuNzcxODk2LDE2Ljc5NzU5NjIgMTYzLjc3MTg5NiwxMS43NzkzMzg0IEMxNjMuNzcxODk2LDYuNzYxMDgwNzIgMTY3LjkwNDQ2OCwyLjY5NDQwNjc1IDE3My4wMDQwNDQsMi42OTQ0MDY3NSBDMTc4LjEwMzYyLDIuNjk0NDA2NzUgMTgyLjIzNjE5Myw2Ljc2MTA4MDcyIDE4Mi4yMzYxOTMsMTEuNzc5MzM4NCBDMTgyLjIzNjE5MywxNi43OTc1OTYyIDE3OC4wOTQ0OTgsMjAuODY0MjcwMSAxNzMuMDA0MDQ0LDIwLjg2NDI3MDEgWiBNMTc0LjAxNjY2MSw2LjI5NDI2NjA1IEwxNzEuNjA4Mjc1LDYuMjk0MjY2MDUgTDE3MS42MDgyNzUsMTIuODAyNzM5OCBMMTc4LjAwMzI3MSwxMi44MDI3Mzk4IEwxNzguMDAzMjcxLDEwLjUzMTUwNjkgTDE3NC4wMTY2NjEsMTAuNTMxNTA2OSBMMTc0LjAxNjY2MSw2LjI5NDI2NjA1IFoiLz4gIDwvZz48L3N2Zz4=); }
+
+		.wrap.ru .logo { background-image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNDUiIGhlaWdodD0iNDciIHZpZXdCb3g9IjAgMCAyNDUgNDciPiAgPGcgZmlsbD0ibm9uZSIgZmlsbC1ydWxlPSJldmVub2RkIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtLjUzNiAtLjEyKSI+ICAgIDxwYXRoIGZpbGw9IiNGRkZGRkYiIGZpbGwtcnVsZT0ibm9uemVybyIgZD0iTS45OTU4MjgxOTYgNC45Mjk4NzI3NUwyMS40NDcxMTc0IDQuOTI5ODcyNzUgMTkuODQ1MDY5MiAxMC4xMzUzNTUzIDcuNDY4MTAyNzkgMTAuMTM1MzU1MyA3LjQ2ODEwMjc5IDE2LjYwODAyMTkgOS41OTE5NjA5MyAxNi42MDgwMjE5QzEyLjk0MjUzMDIgMTYuNjA4MDIxOSAxNS45MTc3NjI1IDE3LjAyNzM3NzcgMTguMjMzODY2NSAxOC4yNDg5Nzk2IDIwLjk3MTA4MDIgMTkuNjUyOTEwMSAyMi42MjgwNTU3IDIyLjE4NzI3ODEgMjIuNjI4MDU1NyAyNi4xMjU1NzY3IDIyLjYyODA1NTcgMzEuNjU5MjUwOCAxOS4yNzc0ODY0IDM1LjgyNTQ2MDEgOS43Mzg0MzM5MSAzNS44MjU0NjAxTDEuMDA0OTgyNzYgMzUuODI1NDYwMSAxLjAwNDk4Mjc2IDQuOTI5ODcyNzUuOTk1ODI4MTk2IDQuOTI5ODcyNzV6TTkuODc1NzUyMzIgMzAuNTc0Mzk1NEMxNC4zMTU3MTQ0IDMwLjU3NDM5NTQgMTYuMTU1NzgxMSAyOS4xNzA0NjQ5IDE2LjE1NTc4MTEgMjYuMjE2NzQxIDE2LjE1NTc4MTEgMjQuNTMwMjAxMSAxNS40OTY2NTI3IDIzLjM1NDE4MTQgMTQuNDA3MjYgMjIuNjk3Nzk4MyAxMy4yMjYzMjE2IDIxLjk5NTgzMzEgMTEuNTIzNTczMyAyMS44MDQzODggOS41OTE5NjA5MyAyMS44MDQzODhMNy40NjgxMDI3OSAyMS44MDQzODggNy40NjgxMDI3OSAzMC41NzQzOTU0IDkuODc1NzUyMzIgMzAuNTc0Mzk1NCA5Ljg3NTc1MjMyIDMwLjU3NDM5NTR6TTI1LjY0OTA2MDggMTMuNjQ1MTgxNUwzMS44Mzc1NDQgMTMuNjQ1MTgxNSAzMS44Mzc1NDQgMjIuNTA2MzUzM0MzMS44Mzc1NDQgMjQuMzM4NzU2IDMxLjc5MTc3MTIgMjYuMTE2NDYwMiAzMS42NDUyOTgzIDI3LjM4MzY0NDNMMzEuNzgyNjE2NyAyNy4zODM2NDQzQzMyLjMwNDQyNjcgMjYuNDkwMjMzOSAzMy4zODQ2NjQ4IDI0LjYyMTM2NTQgMzQuNjY2MzAzNCAyMi43ODg5NjI2TDQxLjAzNzg3NzggMTMuNjQ1MTgxNSA0Ny4yNzIxMzM4IDEzLjY0NTE4MTUgNDcuMjcyMTMzOCAzNS44MTYzNDM3IDQxLjAzNzg3NzggMzUuODE2MzQzNyA0MS4wMzc4Nzc4IDI2Ljk1NTE3MkM0MS4wMzc4Nzc4IDI1LjEyMjc2OTIgNDEuMTI5NDIzNCAyMy4zNDUwNjUgNDEuMjc1ODk2NCAyMi4wNzc4ODFMNDEuMTM4NTc4IDIyLjA3Nzg4MUM0MC42MTY3NjggMjIuOTcxMjkxMyAzOS40ODE2MDI0IDI0Ljg0MDE1OTggMzguMjU0ODkxMyAyNi42NzI1NjI2TDMxLjg4MzMxNjkgMzUuODE2MzQzNyAyNS42NDkwNjA4IDM1LjgxNjM0MzcgMjUuNjQ5MDYwOCAxMy42NDUxODE1IDI1LjY0OTA2MDggMTMuNjQ1MTgxNXoiLz4gICAgPHBvbHlnb24gZmlsbD0iI0ZGRkZGRiIgZmlsbC1ydWxlPSJub256ZXJvIiBwb2ludHM9IjU2Ljc5MyAxOC44OTYgNTAuMTM4IDE4Ljg5NiA1MC4xMzggMTMuNjQ1IDcxLjIwMiAxMy42NDUgNjkuNTQ1IDE4Ljg5NiA2My4xNzQgMTguODk2IDYzLjE3NCAzNS44MTYgNTYuODAyIDM1LjgxNiA1Ni44MDIgMTguODk2Ii8+ICAgIDxwYXRoIGZpbGw9IiNGRkZGRkYiIGZpbGwtcnVsZT0ibm9uemVybyIgZD0iTTczLjE4ODY5NTkgMTQuNTM4NTkxOUM3NS42NDIxMTgyIDEzLjY5MDc2MzcgNzguNjYzMTIzMyAxMy4wODkwNzkyIDgyLjAyMjg0NzIgMTMuMDg5MDc5MiA5MC4zMzUxODg1IDEzLjA4OTA3OTIgOTQuNTM3MTMyIDE3LjcyOTM0MyA5NC41MzcxMzIgMjQuNzEyNTI5NyA5NC41MzcxMzIgMzEuMzY3NTI1IDkwLjAwNTYyNDMgMzYuMjkwMzk4MSA4Mi43NzM1MjEyIDM2LjI5MDM5ODEgODEuNjg0MTI4NCAzNi4yOTAzOTgxIDgwLjYwMzg5MDIgMzYuMTUzNjUxNyA3OS41NjAyNzAzIDM1Ljg3MTA0MjNMNzkuNTYwMjcwMyA0Ni45MzgzOTA1IDczLjE4ODY5NTkgNDYuOTM4MzkwNSA3My4xODg2OTU5IDE0LjUzODU5MTkgNzMuMTg4Njk1OSAxNC41Mzg1OTE5ek04Mi4yOTc0ODQgMzEuMDg0OTE1NkM4Ni4xMjQwOTA1IDMxLjA4NDkxNTYgODguMDA5OTMwMSAyOC41OTYxMjk3IDg4LjAwOTkzMDEgMjQuNzEyNTI5NyA4OC4wMDk5MzAxIDIwLjQwMDQ1NzUgODUuNjQ4MDUzMyAxOC4yOTQ1NjE4IDgxLjcyOTkwMTIgMTguMjk0NTYxOCA4MC45MjQyOTk5IDE4LjI5NDU2MTggODAuMjY1MTcxNSAxOC4zNDAxNDM5IDc5LjU2MDI3MDMgMTguNTc3MTcxMUw3OS41NjAyNzAzIDMwLjYyOTA5NEM4MC40MTE2NDQ1IDMwLjkwMjU4NjkgODEuMjE3MjQ1OCAzMS4wODQ5MTU2IDgyLjI5NzQ4NCAzMS4wODQ5MTU2ek05Ny4wODIxIDEzLjY0NTE4MTVMMTAzLjI3MDU4MyAxMy42NDUxODE1IDEwMy4yNzA1ODMgMjIuNTA2MzUzM0MxMDMuMjcwNTgzIDI0LjMzODc1NiAxMDMuMjI0ODEgMjYuMTE2NDYwMiAxMDMuMDc4MzM3IDI3LjM4MzY0NDNMMTAzLjIxNTY1NiAyNy4zODM2NDQzQzEwMy43Mzc0NjYgMjYuNDkwMjMzOSAxMDQuODE3NzA0IDI0LjYyMTM2NTQgMTA2LjA5OTM0MiAyMi43ODg5NjI2TDExMi40NzA5MTcgMTMuNjQ1MTgxNSAxMTguNzA1MTczIDEzLjY0NTE4MTUgMTE4LjcwNTE3MyAzNS44MTYzNDM3IDExMi40NzA5MTcgMzUuODE2MzQzNyAxMTIuNDcwOTE3IDI2Ljk1NTE3MkMxMTIuNDcwOTE3IDI1LjEyMjc2OTIgMTEyLjU2MjQ2MyAyMy4zNDUwNjUgMTEyLjcwODkzNiAyMi4wNzc4ODFMMTEyLjU3MTYxNyAyMi4wNzc4ODFDMTEyLjA0OTgwNyAyMi45NzEyOTEzIDExMC45MTQ2NDIgMjQuODQwMTU5OCAxMDkuNjg3OTMgMjYuNjcyNTYyNkwxMDMuMzE2MzU2IDM1LjgxNjM0MzcgOTcuMDgyMSAzNS44MTYzNDM3IDk3LjA4MjEgMTMuNjQ1MTgxNXpNMTIzLjEwODUxNyAxMy42NDUxODE1TDEyOS40ODAwOTEgMTMuNjQ1MTgxNSAxMjkuNDgwMDkxIDIyLjEzMjU3OTUgMTMxLjg0MTk2OCAyMi4xMzI1Nzk1QzEzNC41MzM0MDkgMjIuMTMyNTc5NSAxMzQuNDQxODYzIDE3LjYyOTA2MjIgMTM2LjQxOTI0OCAxNS4wMDM1Mjk5IDEzNy4yNzA2MjMgMTMuODI3NTEwMiAxMzguNTg4ODc5IDEzLjA3OTk2MjggMTQwLjYyMTE5MiAxMy4wNzk5NjI4IDE0MS4yODAzMiAxMy4wNzk5NjI4IDE0Mi40NjEyNTkgMTMuMTcxMTI3MSAxNDMuMTc1MzE0IDEzLjQwODE1NDNMMTQzLjE3NTMxNCAxOC43OTU5NjU1QzE0Mi43OTk5NzcgMTguNjU5MjE5IDE0Mi4zMjM5NCAxOC41NTg5MzgzIDE0MS44NTcwNTggMTguNTU4OTM4MyAxNDEuMTUyMTU2IDE4LjU1ODkzODMgMTQwLjY3NjExOSAxOC43OTU5NjU1IDE0MC4zMDA3ODIgMTkuMjYwOTAzNSAxMzkuMTY1NjE3IDIwLjY2NDgzNCAxMzguOTgyNTI1IDIzLjUyNzM5MzYgMTM3LjMyNTU1IDI0LjU1NzU1MDRMMTM3LjMyNTU1IDI0LjY0ODcxNDdDMTM4LjQxNDk0MyAyNS4wNjgwNzA2IDEzOS4yMTEzODkgMjUuODcwMzE2NiAxMzkuODc5NjcyIDI3LjI3NDI0NzFMMTQzLjg5ODUyNSAzNS44MDcyMjcyIDEzNy4wMDUxNCAzNS44MDcyMjcyIDEzNC4zNTk0NzIgMjguODY5NjIyNkMxMzMuNzkxODg5IDI3LjUxMTI3NDMgMTMzLjIyNDMwNyAyNi45MDA0NzM0IDEzMi42MTA5NTEgMjYuOTAwNDczNEwxMjkuNDk4NCAyNi45MDA0NzM0IDEyOS40OTg0IDM1LjgwNzIyNzIgMTIzLjEyNjgyNiAzNS44MDcyMjcyIDEyMy4xMjY4MjYgMTMuNjQ1MTgxNSAxMjMuMTA4NTE3IDEzLjY0NTE4MTV6TTE0NC44NTA1OTkgMjQuODQ5Mjc2MkMxNDQuODUwNTk5IDE3LjgyMDUwNzMgMTUwLjMyNTAyNiAxMy4wNzk5NjI4IDE1Ni44OTgwMDEgMTMuMDc5OTYyOCAxNTkuOTE5MDA2IDEzLjA3OTk2MjggMTYxLjkwNTU0NiAxMy45Mjc3OTA5IDE2My4wODY0ODQgMTQuNjc1MzM4M0wxNjMuMDg2NDg0IDE5Ljk3MTk4NTJDMTYxLjQ4NDQzNiAxOC43NTAzODM0IDE1OS43ODE2ODggMTguMDk0MDAwMyAxNTcuNjEyMDU3IDE4LjA5NDAwMDMgMTUzLjY5MzkwNSAxOC4wOTQwMDAzIDE1MS4zNzc4MDEgMjEuMDQ3NzI0MiAxNTEuMzc3ODAxIDI0Ljc5NDU3NzYgMTUxLjM3NzgwMSAyOC45Njk5MDM0IDE1My43Mzk2NzggMzEuMjEyNTQ1NiAxNTcuMzI4MjY2IDMxLjIxMjU0NTYgMTU5LjMxNDgwNSAzMS4yMTI1NDU2IDE2MC44MjUzMDggMzAuNjQ3MzI2OCAxNjIuNDczMTI5IDI5LjcwODMzNDRMMTY0LjI2NzQyMyAzNC4wMjA0MDY2QzE2Mi40MjczNTYgMzUuMzMzMTcyOCAxNTkuNTQzNjY5IDM2LjI3MjE2NTMgMTU2LjQzMTExOSAzNi4yNzIxNjUzIDE0OS4wMDY3NyAzNi4yOTAzOTgxIDE0NC44NTA1OTkgMzEuMzY3NTI1IDE0NC44NTA1OTkgMjQuODQ5Mjc2MnoiLz4gICAgPHBhdGggZmlsbD0iIzIxNUY5OCIgZmlsbC1ydWxlPSJub256ZXJvIiBkPSJNMTgzLjE5OTA1NSwxMi44MzM4MTkxIEMxODMuMTk5MDU1LDEwLjA3MTU0MDMgMTgwLjkwMTI2LDkuMDk2MDgyMDggMTc4LjQ1Njk5Miw5LjA5NjA4MjA4IEMxNzUuMTc5NjU5LDkuMDk2MDgyMDggMTcyLjQ5NzM3MywxMC4xNjI3MDQ2IDE3MC4wMDczMzMsMTEuMjc0OTA5MyBMMTY4LjI5NTQzLDYuMTc4ODIzOSBDMTcxLjA3ODQxNiw0LjkyMDc1NjMxIDE3NC45NDE2NDEsMy41MDc3MDkzOSAxNzkuNTM3MjMsMy41MDc3MDkzOSBDMTg2LjcyMzU2MSwzLjUwNzcwOTM5IDE5MC4xOTMxMzksNy4wOTk1ODM1MSAxOTAuMTkzMTM5LDEyLjE0MDk3MDMgQzE5MC4xOTMxMzksMjAuOTY1Njc2MyAxNzcuOTgwOTU1LDIzLjQ0NTM0NTcgMTc1LjkyMTE3OSwzMC4xODIzODg4IEwxOTAuNjMyNTU4LDMwLjE4MjM4ODggTDE5MC42MzI1NTgsMzUuODA3MjI3MiBMMTY3LjIyNDM0NiwzNS44MDcyMjcyIEMxNjguNTQyNjAzLDIwLjA2MzE0OTUgMTgzLjE5OTA1NSwxOS4xMzMyNzM1IDE4My4xOTkwNTUsMTIuODMzODE5MSBaIi8+ICAgIDxwYXRoIGZpbGw9IiMyMTVGOTgiIGZpbGwtcnVsZT0ibm9uemVybyIgZD0iTTE4OS45NzM0MywyMy45ODMyMTUyIEwyMDYuMDk0NjEyLDMuNjE3MTA2NTcgTDIxMC44ODI0NDcsMy42MTcxMDY1NyBMMjEwLjg4MjQ0NywyMi44NzEwMTA1IEwyMTUuNjcwMjgzLDIyLjg3MTAxMDUgTDIxNS42NzAyODMsMjguMjA0MTIzMSBMMjEwLjg4MjQ0NywyOC4yMDQxMjMxIEwyMTAuODgyNDQ3LDM1LjgxNjM0MzcgTDIwNC4zODI3MDksMzUuODE2MzQzNyBMMjA0LjM4MjcwOSwyOC4yMDQxMjMxIEwxODkuOTY0Mjc1LDI4LjIwNDEyMzEgTDE4OS45NjQyNzUsMjMuOTgzMjE1MiBMMTg5Ljk3MzQzLDIzLjk4MzIxNTIgWiBNMjAxLjQ1MzI0OSwyMi44NzEwMTA1IEwyMDQuMzgyNzA5LDIyLjg3MTAxMDUgTDIwNC4zODI3MDksMTkuNDI0OTk5MyBDMjA0LjM4MjcwOSwxNi45NTQ0NDYzIDIwNC41NzQ5NTUsMTQuMDkxODg2NyAyMDQuNjc1NjU1LDEzLjQ2Mjg1MjkgTDE5Ny4zOTc3NzksMjMuMDE2ODczNCBDMTk3Ljk4MzY3MSwyMi45NzEyOTEzIDIwMC4zMjcyMzgsMjIuODcxMDEwNSAyMDEuNDUzMjQ5LDIyLjg3MTAxMDUgWiIvPiAgICA8cGF0aCBmaWxsPSIjMDA2NkExIiBkPSJNMjMzLjgwNTQ2OCwwLjkxODY0Mjc1NiBDMjI3LjM3ODk2NiwwLjkxODY0Mjc1NiAyMjIuMTc5MTc1LDYuMTA1ODkyNDUgMjIyLjE3OTE3NSwxMi40OTY1MTExIEMyMjIuMTc5MTc1LDE4Ljg4NzEyOTggMjI3LjM4ODEyMSwyNC4wNzQzNzk1IDIzMy44MDU0NjgsMjQuMDc0Mzc5NSBDMjQwLjIzMTk3LDI0LjA3NDM3OTUgMjQ1LjQzMTc2LDE4Ljg4NzEyOTggMjQ1LjQzMTc2LDEyLjQ5NjUxMTEgQzI0NS40MzE3Niw2LjEwNTg5MjQ1IDI0MC4yMjI4MTUsMC45MTg2NDI3NTYgMjMzLjgwNTQ2OCwwLjkxODY0Mjc1NiBaIE0yMzMuODUxMjQxLDIxLjc0MDU3MyBDMjI4LjczMzg0MSwyMS43NDA1NzMgMjI0LjU4NjgyNSwxNy42MTA4Mjk0IDIyNC41ODY4MjUsMTIuNTE0NzQ0IEMyMjQuNTg2ODI1LDcuNDE4NjU4NjMgMjI4LjczMzg0MSwzLjI4ODkxNTAyIDIzMy44NTEyNDEsMy4yODg5MTUwMiBDMjM4Ljk2ODY0LDMuMjg4OTE1MDIgMjQzLjExNTY1Niw3LjQxODY1ODYzIDI0My4xMTU2NTYsMTIuNTE0NzQ0IEMyNDMuMTE1NjU2LDE3LjYxMDgyOTQgMjM4Ljk1OTQ4NiwyMS43NDA1NzMgMjMzLjg1MTI0MSwyMS43NDA1NzMgWiBNMjM0Ljg2NzM5Nyw2Ljk1MzcyMDYxIEwyMzIuNDUwNTkzLDYuOTUzNzIwNjEgTDIzMi40NTA1OTMsMTMuNTYzMTMzNyBMMjM4Ljg2Nzk0LDEzLjU2MzEzMzcgTDIzOC44Njc5NCwxMS4yNTY2NzY0IEwyMzQuODY3Mzk3LDExLjI1NjY3NjQgTDIzNC44NjczOTcsNi45NTM3MjA2MSBaIi8+ICA8L2c+PC9zdmc+); }
+
+		.wrap.ua .logo { background-image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMTgiIGhlaWdodD0iNDciIHZpZXdCb3g9IjAgMCAyMTggNDciPiAgPGcgZmlsbD0ibm9uZSIgZmlsbC1ydWxlPSJldmVub2RkIj4gICAgPGcgZmlsbD0iI0ZGRkZGRiIgZmlsbC1ydWxlPSJub256ZXJvIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgwIDEuODYpIj4gICAgICA8cGF0aCBkPSJNLjg5NTY0MDI2NiAyLjYwNzU4NDU5TDIxLjI0OTM0NzMgMi42MDc1ODQ1OSAxOS42NTQ5NDMyIDcuODE2NzM2NDYgNy4zMzcwMzI3NiA3LjgxNjczNjQ2IDcuMzM3MDMyNzYgMTQuMjkzOTY1NiA5LjQ1MDc1NzA0IDE0LjI5Mzk2NTZDMTIuNzg1MzM5MyAxNC4yOTM5NjU2IDE1Ljc0NjM3NTQgMTQuNzEzNjE3IDE4LjA1MTQyODIgMTUuOTM2MDggMjAuNzc1NTgxNSAxNy4zNDEwMDAxIDIyLjQyNDY1MDggMTkuODc3MTU0NiAyMi40MjQ2NTA4IDIzLjgxODIyOTIgMjIuNDI0NjUwOCAyOS4zNTU4MDQgMTkuMDkwMDY4NiAzMy41MjQ5NSA5LjU5NjUzMTEyIDMzLjUyNDk1TC45MDQ3NTExNDYgMzMuNTI0OTUuOTA0NzUxMTQ2IDIuNjA3NTg0NTkuODk1NjQwMjY2IDIuNjA3NTg0NTl6TTkuNzMzMTk0MzMgMjguMjcwMTgzOUMxNC4xNTE5NzE0IDI4LjI3MDE4MzkgMTUuOTgzMjU4MyAyNi44NjUyNjM4IDE1Ljk4MzI1ODMgMjMuOTA5NDU3OCAxNS45ODMyNTgzIDIyLjIyMTcyOTEgMTUuMzI3Mjc0OSAyMS4wNDQ4ODA0IDE0LjI0MzA4MDIgMjAuMzg4MDM0NyAxMy4wNjc3NzY2IDE5LjY4NTU3NDYgMTEuMzczMTUyOCAxOS40OTM5OTQ2IDkuNDUwNzU3MDQgMTkuNDkzOTk0Nkw3LjMzNzAzMjc2IDE5LjQ5Mzk5NDYgNy4zMzcwMzI3NiAyOC4yNzAxODM5IDkuNzMzMTk0MzMgMjguMjcwMTgzOSA5LjczMzE5NDMzIDI4LjI3MDE4Mzl6TTI1LjYyMjU2OTkgNC40ODY4OTMzMkMyNS42MjI1Njk5IDIuNDcwNzQxNzIgMjcuMjcxNjM5My44Mjg2MjczMDEgMjkuNDc2NDcyMy44Mjg2MjczMDEgMzEuNjM1NzUxLjgyODYyNzMwMSAzMy4yODQ4MjA0IDIuMzc5NTEzMTUgMzMuMjg0ODIwNCA0LjQ4Njg5MzMyIDMzLjI4NDgyMDQgNi41NDg2NTkyMSAzMS42MzU3NTEgOC4yMzYzODc5MiAyOS40NzY0NzIzIDguMjM2Mzg3OTIgMjcuMjcxNjM5MyA4LjIzNjM4NzkyIDI1LjYyMjU2OTkgNi41OTQyNzM1IDI1LjYyMjU2OTkgNC40ODY4OTMzMnpNMjYuMjc4NTUzMyAxMS4zMzgxNTk2TDMyLjYxOTcyNjEgMTEuMzM4MTU5NiAzMi42MTk3MjYxIDMzLjUyNDk1IDI2LjI3ODU1MzMgMzMuNTI0OTUgMjYuMjc4NTUzMyAxMS4zMzgxNTk2eiIvPiAgICAgIDxwb2x5Z29uIHBvaW50cz0iNDIuMTY4IDE2LjU5MyAzNS41NDQgMTYuNTkzIDM1LjU0NCAxMS4zMzggNTYuNTA4IDExLjMzOCA1NC44NTkgMTYuNTkzIDQ4LjUxOCAxNi41OTMgNDguNTE4IDMzLjUyNSA0Mi4xNzcgMzMuNTI1IDQyLjE3NyAxNi41OTMiLz4gICAgICA8cGF0aCBkPSJNNTguOTA0NjE2MyAxMi4yMjMwNzY4QzYxLjM0NjMzMjIgMTEuMzc0NjUxIDY0LjM1MjkyMjggMTAuNzcyNTQyNCA2Ny42OTY2MTU5IDEwLjc3MjU0MjQgNzUuOTY5Mjk1NCAxMC43NzI1NDI0IDgwLjE1MTE4OTYgMTUuNDE2MDc3MSA4MC4xNTExODk2IDIyLjQwNDE4NjMgODAuMTUxMTg5NiAyOS4wNjM4NzI1IDc1LjY0MTMwMzcgMzMuOTkwMjE1OCA2OC40NDM3MDgxIDMzLjk5MDIxNTggNjcuMzU5NTEzNCAzMy45OTAyMTU4IDY2LjI4NDQyOTUgMzMuODUzMzcyOSA2NS4yNDU3ODkxIDMzLjU3MDU2NDNMNjUuMjQ1Nzg5MSA0NC42NDU3MTM4IDU4LjkwNDYxNjMgNDQuNjQ1NzEzOCA1OC45MDQ2MTYzIDEyLjIyMzA3NjggNTguOTA0NjE2MyAxMi4yMjMwNzY4ek02Ny45Njk5NDI0IDI4Ljc4MTA2MzlDNzEuNzc4MjkwNCAyOC43ODEwNjM5IDczLjY1NTEzMTggMjYuMjkwNTIzNyA3My42NTUxMzE4IDIyLjQwNDE4NjMgNzMuNjU1MTMxOCAxOC4wODkwNzQ1IDcxLjMwNDUyNDYgMTUuOTgxNjk0MyA2Ny40MDUwNjc4IDE1Ljk4MTY5NDMgNjYuNjAzMzEwMyAxNS45ODE2OTQzIDY1Ljk0NzMyNjkgMTYuMDI3MzA4NiA2NS4yNDU3ODkxIDE2LjI2NDUwMjlMNjUuMjQ1Nzg5MSAyOC4zMjQ5MjFDNjYuMDkzMTAxIDI4LjU5ODYwNjggNjYuODk0ODU4NSAyOC43ODEwNjM5IDY3Ljk2OTk0MjQgMjguNzgxMDYzOXpNODIuODc1MzQyOCA0LjQ4Njg5MzMyQzgyLjg3NTM0MjggMi40NzA3NDE3MiA4NC41MjQ0MTIyLjgyODYyNzMwMSA4Ni43MjkyNDUzLjgyODYyNzMwMSA4OC44ODg1MjM5LjgyODYyNzMwMSA5MC41Mzc1OTMzIDIuMzc5NTEzMTUgOTAuNTM3NTkzMyA0LjQ4Njg5MzMyIDkwLjUzNzU5MzMgNi41NDg2NTkyMSA4OC44ODg1MjM5IDguMjM2Mzg3OTIgODYuNzI5MjQ1MyA4LjIzNjM4NzkyIDg0LjUxNTMwMTMgOC4yMzYzODc5MiA4Mi44NzUzNDI4IDYuNTk0MjczNSA4Mi44NzUzNDI4IDQuNDg2ODkzMzJ6TTgzLjUzMTMyNjIgMTEuMzM4MTU5Nkw4OS44NzI0OTkgMTEuMzM4MTU5NiA4OS44NzI0OTkgMzMuNTI0OTUgODMuNTMxMzI2MiAzMy41MjQ5NSA4My41MzEzMjYyIDExLjMzODE1OTZ6TTk0LjMzNjgzMDUgMTEuMzM4MTU5NkwxMDAuNjc4MDAzIDExLjMzODE1OTYgMTAwLjY3ODAwMyAxOS44MzE1NDAzIDEwMy4wMjg2MSAxOS44MzE1NDAzQzEwNS43MDcyMDkgMTkuODMxNTQwMyAxMDUuNjE2MSAxNS4zMjQ4NDg1IDEwNy41ODQwNTEgMTIuNjk3NDY1NCAxMDguNDMxMzYzIDExLjUyMDYxNjggMTA5Ljc0MzMyOSAxMC43NzI1NDI0IDExMS43NjU5NDUgMTAuNzcyNTQyNCAxMTIuNDIxOTI4IDEwLjc3MjU0MjQgMTEzLjU5NzIzMiAxMC44NjM3NzEgMTE0LjMwNzg4IDExLjEwMDk2NTNMMTE0LjMwNzg4IDE2LjQ5MjU3NDNDMTEzLjkzNDMzNCAxNi4zNTU3MzE1IDExMy40NjA1NjkgMTYuMjU1MzggMTEyLjk5NTkxNCAxNi4yNTUzOCAxMTIuMjk0Mzc2IDE2LjI1NTM4IDExMS44MjA2MSAxNi40OTI1NzQzIDExMS40NDcwNjQgMTYuOTU3ODQwMSAxMTAuMzE3MzE1IDE4LjM2Mjc2MDIgMTEwLjEzNTA5NyAyMS4yMjczMzc2IDEwOC40ODYwMjggMjIuMjU4MjIwNUwxMDguNDg2MDI4IDIyLjM0OTQ0OTFDMTA5LjU3MDIyMyAyMi43NjkxMDA2IDExMC4zNjI4NjkgMjMuNTcxOTEyMSAxMTEuMDI3OTYzIDI0Ljk3NjgzMjJMMTE1LjAyNzY0IDMzLjUxNTgyNzIgMTA4LjE2NzE0NyAzMy41MTU4MjcyIDEwNS41MzQxMDMgMjYuNTczMzMyM0MxMDQuOTY5MjI4IDI1LjIxNDAyNjUgMTA0LjQwNDM1MyAyNC42MDI3OTUgMTAzLjc5MzkyNCAyNC42MDI3OTVMMTAwLjY5NjIyNSAyNC42MDI3OTUgMTAwLjY5NjIyNSAzMy41MTU4MjcyIDk0LjM1NTA1MjIgMzMuNTE1ODI3MiA5NC4zNTUwNTIyIDExLjMzODE1OTYgOTQuMzM2ODMwNSAxMS4zMzgxNTk2ek0xMTYuNTIxODI0IDIyLjU1MDE1MkMxMTYuNTIxODI0IDE1LjUxNjQyODUgMTIxLjk3MDEzMSAxMC43NzI1NDI0IDEyOC41MTE3NDMgMTAuNzcyNTQyNCAxMzEuNTE4MzM0IDEwLjc3MjU0MjQgMTMzLjQ5NTM5NSAxMS42MjA5NjgyIDEzNC42NzA2OTggMTIuMzY5MDQyNkwxMzQuNjcwNjk4IDE3LjY2OTQyM0MxMzMuMDc2Mjk0IDE2LjQ0Njk2IDEzMS4zODE2NyAxNS43OTAxMTQzIDEyOS4yMjIzOTIgMTUuNzkwMTE0MyAxMjUuMzIyOTM1IDE1Ljc5MDExNDMgMTIzLjAxNzg4MiAxOC43NDU5MjAyIDEyMy4wMTc4ODIgMjIuNDk1NDE0OCAxMjMuMDE3ODgyIDI2LjY3MzY4MzggMTI1LjM2ODQ4OSAyOC45MTc5MDY4IDEyOC45Mzk5NTUgMjguOTE3OTA2OCAxMzAuOTE3MDE2IDI4LjkxNzkwNjggMTMyLjQyMDMxMSAyOC4zNTIyODk2IDEzNC4wNjAyNjkgMjcuNDEyNjM1MkwxMzUuODQ2MDAyIDMxLjcyNzc0N0MxMzQuMDE0NzE1IDMzLjA0MTQzODYgMTMxLjE0NDc4OCAzMy45ODEwOTI5IDEyOC4wNDcwODggMzMuOTgxMDkyOSAxMjAuNjU4MTY0IDMzLjk5MDIxNTggMTE2LjUyMTgyNCAyOS4wNjM4NzI1IDExNi41MjE4MjQgMjIuNTUwMTUyeiIvPiAgICA8L2c+ICAgIDxwYXRoIGZpbGw9IiMyMTVGOTgiIGZpbGwtcnVsZT0ibm9uemVybyIgZD0iTTE1NS41NzEwNTgsMTIuMzc2NDU1NiBDMTU1LjU3MTA1OCw5LjYxMjIyOTY4IDE1My4yODQyMjcsOC42MzYwODM4OCAxNTAuODUxNjIyLDguNjM2MDgzODggQzE0Ny41ODk5MjcsOC42MzYwODM4OCAxNDQuOTIwNDM5LDkuNzAzNDU4MjYgMTQyLjQ0MjI3OSwxMC44MTY0NDY5IEwxNDAuNzM4NTQ1LDUuNzE2NzY5MzUgQzE0My41MDgyNTIsNC40NTc4MTQ5NiAxNDcuMzUzMDQ0LDMuMDQzNzcxOTggMTUxLjkyNjcwNiwzLjA0Mzc3MTk4IEMxNTkuMDc4NzQ3LDMuMDQzNzcxOTggMTYyLjUzMTc3MSw2LjYzODE3OCAxNjIuNTMxNzcxLDExLjY4MzExODQgQzE2Mi41MzE3NzEsMjAuNTE0MDQ0OSAxNTAuMzc3ODU2LDIyLjk5NTQ2MjIgMTQ4LjMyNzkwOCwyOS43MzcyNTQyIEwxNjIuOTY5MDkzLDI5LjczNzI1NDIgTDE2Mi45NjkwOTMsMzUuMzY2MDU3NSBMMTM5LjY3MjU3MiwzNS4zNjYwNTc1IEMxNDAuOTg0NTM5LDE5LjYxMDg4MTkgMTU1LjU3MTA1OCwxOC42ODk0NzMzIDE1NS41NzEwNTgsMTIuMzc2NDU1NiBaIi8+ICAgIDxwYXRoIGZpbGw9IiMyMTVGOTgiIGZpbGwtcnVsZT0ibm9uemVybyIgZD0iTTE2Mi4zMTMxMSwyMy41NDI4MzM3IEwxNzguMzU3MzcsMy4xNjIzNjkxNCBMMTgzLjEyMjM2MSwzLjE2MjM2OTE0IEwxODMuMTIyMzYxLDIyLjQyOTg0NSBMMTg3Ljg4NzM1MSwyMi40Mjk4NDUgTDE4Ny44ODczNTEsMjcuNzY2NzE2OSBMMTgzLjEyMjM2MSwyNy43NjY3MTY5IEwxODMuMTIyMzYxLDM1LjM4NDMwMzMgTDE3Ni42NTM2MzYsMzUuMzg0MzAzMyBMMTc2LjY1MzYzNiwyNy43NjY3MTY5IEwxNjIuMzAzOTk5LDI3Ljc2NjcxNjkgTDE2Mi4zMDM5OTksMjMuNTQyODMzNyBMMTYyLjMxMzExLDIzLjU0MjgzMzcgWiBNMTczLjczODE1NCwyMi40MjA3MjIyIEwxNzYuNjUzNjM2LDIyLjQyMDcyMjIgTDE3Ni42NTM2MzYsMTguOTcyMjgxOSBDMTc2LjY1MzYzNiwxNi40OTk5ODc0IDE3Ni44NDQ5NjQsMTMuNjM1NDEgMTc2Ljk0NTE4NCwxMy4wMDU5MzI4IEwxNjkuNzAyMDM0LDIyLjU2NjY4NzkgQzE3MC4yODUxMywyMi41MjEwNzM2IDE3Mi42MTc1MTYsMjIuNDIwNzIyMiAxNzMuNzM4MTU0LDIyLjQyMDcyMjIgWiIvPiAgICA8cGF0aCBmaWxsPSIjMDA2NkExIiBkPSJNMjA1LjkzNjAwNSwwLjQ1Mjg4MDMzOCBDMTk5LjU0MDE2NywwLjQ1Mjg4MDMzOCAxOTQuMzY1MTg3LDUuNjQzNzg2NDkgMTk0LjM2NTE4NywxMi4wMzg5MDk5IEMxOTQuMzY1MTg3LDE4LjQzNDAzMzMgMTk5LjU0OTI3OCwyMy42MjQ5Mzk0IDIwNS45MzYwMDUsMjMuNjI0OTM5NCBDMjEyLjMzMTg0NCwyMy42MjQ5Mzk0IDIxNy41MDY4MjQsMTguNDM0MDMzMyAyMTcuNTA2ODI0LDEyLjAzODkwOTkgQzIxNy41MDY4MjQsNS42NDM3ODY0OSAyMTIuMzIyNzMzLDAuNDUyODgwMzM4IDIwNS45MzYwMDUsMC40NTI4ODAzMzggWiBNMjA1Ljk4MTU2LDIxLjI4OTQ4NzggQzIwMC44ODg1NzgsMjEuMjg5NDg3OCAxOTYuNzYxMzQ5LDE3LjE1NjgzMzIgMTk2Ljc2MTM0OSwxMi4wNTcxNTU2IEMxOTYuNzYxMzQ5LDYuOTU3NDc4MDMgMjAwLjg4ODU3OCwyLjgyNDgyMzM5IDIwNS45ODE1NiwyLjgyNDgyMzM5IEMyMTEuMDc0NTQyLDIuODI0ODIzMzkgMjE1LjIwMTc3MSw2Ljk1NzQ3ODAzIDIxNS4yMDE3NzEsMTIuMDU3MTU1NiBDMjE1LjIwMTc3MSwxNy4xNTY4MzMyIDIxMS4wNjU0MzEsMjEuMjg5NDg3OCAyMDUuOTgxNTYsMjEuMjg5NDg3OCBaIE0yMDYuOTkyODY4LDYuNDkyMjEyMjcgTDIwNC41ODc1OTUsNi40OTIyMTIyNyBMMjA0LjU4NzU5NSwxMy4xMDYyODQzIEwyMTAuOTc0MzIyLDEzLjEwNjI4NDMgTDIxMC45NzQzMjIsMTAuNzk4MjAxMiBMMjA2Ljk5Mjg2OCwxMC43OTgyMDEyIEwyMDYuOTkyODY4LDYuNDkyMjEyMjcgWiIvPiAgPC9nPjwvc3ZnPg==); }
+
+		.buslogo {
+			width: 255px;
+			display: block;
+			height: 46px;
+			background-repeat: no-repeat;
+			/*background-size:cover;*/
+		}
+
+		.wrap.en .buslogo,
+		.wrap.de .buslogo { background-image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI5OS42NTYiIGhlaWdodD0iMzMuNzUiIHZpZXdCb3g9IjAgMCA5OS42NTYgMzMuNzUiPiAgPGRlZnM+ICAgIDxzdHlsZT4gICAgICAuY2xzLTEgeyAgICAgICAgZmlsbDogI2ZmZjsgICAgICAgIGZpbGwtcnVsZTogZXZlbm9kZDsgICAgICB9ICAgIDwvc3R5bGU+ICA8L2RlZnM+ICA8cGF0aCBpZD0iQml0cml4X2NvcHkiIGRhdGEtbmFtZT0iQml0cml4IGNvcHkiIGNsYXNzPSJjbHMtMSIgZD0iTTE4MS4wMTQsMTE3LjMxNGgxMC4xMzVjNy4zNDgsMCwxMS4xLTQuNDY3LDExLjEtOS4zNjZhNy42MjEsNy42MjEsMCwwLDAtNS45NTYtNy42Mzd2LTAuMWE3LjEzLDcuMTMsMCwwLDAsMy44NDMtNi41MzJjMC00LjEzMS0zLjA3NC04LjAyMS05Ljg0Ny04LjAyMWgtOS4yN3YzMS42NTNabTUuNzY0LTQuNzU1di04LjkzNEgxOTEuMWMzLjIxOCwwLDUuMjgzLDEuNjMzLDUuMjgzLDQuMzIzLDAsMy4yMTgtMi4wNjUsNC42MTEtNS45MDgsNC42MTFoLTMuN1ptMC0xMy42ODlWOTAuNDE2aDIuNjljMy40NTgsMCw0Ljk0NywxLjg3Myw0Ljk0Nyw0LjIyNywwLDIuNDUtMS42ODEsNC4yMjctNC45LDQuMjI3aC0yLjczOFptMTkuMjQ5LDE4LjQ0NGg1Ljc2NFY5NC42aC01Ljc2NHYyMi43MTlaTTIwOC45MDksOTAuOWEzLjQzNSwzLjQzNSwwLDEsMC0zLjUwNi0zLjQxQTMuMzg2LDMuMzg2LDAsMCwwLDIwOC45MDksOTAuOVptMTUuODQ2LDI2LjlhMTIuOTkyLDEyLjk5MiwwLDAsMCw2LjYyOS0xLjc3N2wtMS43My0zLjkzOGE2LjQyOSw2LjQyOSwwLDAsMS0zLjQ1OCwxLjFjLTEuNDg5LDAtMi4yMDktLjc2OC0yLjIwOS0yLjg4MlY5OS4wNjJoNS40NzVsMS4zOTMtNC40NjdoLTYuODY4Vjg3LjYzMWwtNS43MTYsMS42ODFWOTQuNmgtNC4wODN2NC40NjdoNC4wODN2MTIuNjMyQzIxOC4yNzEsMTE1LjQ4OSwyMjAuNzIsMTE3Ljc5NCwyMjQuNzU1LDExNy43OTRabTguNjM4LS40OGg1LjcxNlYxMDEuMjcyYzEuODczLTEuNjM0LDMuMTIyLTIuMjU4LDQuNjExLTIuMjU4YTQuODU2LDQuODU2LDAsMCwxLDIuNTk0Ljc2OWwyLjAxNy00Ljg1MWE1Ljk0Nyw1Ljk0NywwLDAsMC0zLjIxOC0uOTEzYy0yLjMwNiwwLTQuMTc5LDEuMDU3LTYuMjQ0LDMuMTIyTDIzOC4yNDQsOTQuNmgtNC44NTF2MjIuNzE5Wm0xNi40NjgsMGg1Ljc2NFY5NC42aC01Ljc2NHYyMi43MTlaTTI1Mi43NDMsOTAuOWEzLjQzNSwzLjQzNSwwLDEsMC0zLjUwNi0zLjQxQTMuMzg2LDMuMzg2LDAsMCwwLDI1Mi43NDMsOTAuOVptNC44NDcsMjYuNDE3aDZsNS41NzItNy41ODksNS40NzUsNy41ODloNmwtOC40LTExLjQzMUwyODAuNTQ5LDk0LjZoLTUuOTU2bC01LjM3OSw3LjQtNS4zMzItNy40aC02bDguMjE0LDExLjI4OFoiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0xODEgLTg0LjAzMSkiLz48L3N2Zz4=); }
+
+		.wrap.ru .buslogo { background-image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMzAuNjU2IiBoZWlnaHQ9IjQzLjMxMyIgdmlld0JveD0iMCAwIDIzMC42NTYgNDMuMzEzIj4gIDxkZWZzPiAgICA8c3R5bGU+ICAgICAgLmNscy0xIHsgICAgICAgIGZpbGw6ICNmZmY7ICAgICAgICBmaWxsLXJ1bGU6IGV2ZW5vZGQ7ICAgICAgfSAgICA8L3N0eWxlPiAgPC9kZWZzPiAgPHBhdGggaWQ9Il8xQy3QkdC40YLRgNC40LrRgSIgZGF0YS1uYW1lPSIxQy3QkdC40YLRgNC40LrRgSIgY2xhc3M9ImNscy0xIiBkPSJNMTg3Ljg4MiwxMTcuMzE0aDUuNjY4Vjg1LjQyMWgtNC4zNzFsLTEwLjU2Nyw0LjgsMS45MjIsNC40NjcsNy4zNDgtMy4zMTR2MjUuOTM3Wm0zNi40LTYuNThhMTQuOTQ2LDE0Ljk0NiwwLDAsMS03Ljc4MSwyLjIwOWMtNi40ODQsMC0xMC41MTktNC42MTEtMTAuNTE5LTExLjIzOSwwLTYuMiwzLjctMTEuNDgsMTAuNzExLTExLjQ4YTE3LjAxNiwxNy4wMTYsMCwwLDEsOC4xNjUsMi4wNjVWODYuOTFhMjEuMTYxLDIxLjE2MSwwLDAsMC04LjMwOS0xLjUzN2MtMTAuMTgzLDAtMTYuNzE1LDcuMy0xNi43MTUsMTYuNDc1LDAsOS4yNyw1LjYyLDE1Ljk0NiwxNS45OTQsMTUuOTQ2YTIwLjI3NCwyMC4yNzQsMCwwLDAsMTAuMDM5LTIuNVptNC40NTUtMi45M0gyNDEuMzdWMTAzSDIyOC43Mzd2NC44Wm0yMy41NzcsNC43NTV2LTkuOTQzaDIuNGExMC41NjksMTAuNTY5LDAsMCwxLDUuMTM5Ljk2MSw0LjI0Miw0LjI0MiwwLDAsMSwyLjAxNyw0LjAzNWMwLDMuMzYyLTIuMDY1LDQuOTQ3LTYuNzcyLDQuOTQ3aC0yLjc4NlptLTUuODEyLDQuNzU1aDguNDU0YzkuMzY2LDAsMTIuNzc2LTQuMTMxLDEyLjc3Ni05Ljg0NiwwLTMuODkxLTEuNjMzLTYuNDg1LTQuNDY3LTcuOTc0LTIuMjU3LTEuMi01LjE4Ny0xLjU4NS04LjY0NS0xLjU4NWgtMi4zMDZWOTAuMzY4aDEyLjY4bDEuNTM3LTQuNzA3SDI0Ni41djMxLjY1M1ptMjUuMDYyLDBoNS41NzFsNy4xMDktMTAuMjMxYzEuMzQ1LTEuOTIxLDIuNC0zLjcsMy4wMjYtNC43NTVoMC4xYy0wLjEsMS4zNDUtLjE5MiwzLjA3NC0wLjE5Miw0Ljl2MTAuMDg3aDUuNjJWOTQuNmgtNS41NzJsLTcuMTA5LDEwLjIzMWMtMS4zLDEuOTIxLTIuNCwzLjctMy4wMjYsNC43NTVoLTAuMWMwLjEtMS4zNDUuMTkyLTMuMDc0LDAuMTkyLTQuOVY5NC42aC01LjYxOXYyMi43MTlabTMwLjg3MywwaDUuNzE2Vjk5LjM1aDYuNzI1bDEuNDg5LTQuNzU1SDI5NS41MjFWOTkuMzVoNi45MTZ2MTcuOTY0Wk0zMTguNDIzLDEyOC43aDUuNzE2VjExNy4yNjZhMTIuMTU1LDEyLjE1NSwwLDAsMCwzLjUwNi41MjhjNy4xMDksMCwxMS44MTYtNC45NDcsMTEuODE2LTExLjkxMSwwLTcuMjUzLTQuMjc1LTExLjg2NC0xMi40NC0xMS44NjRhMjYuNjQsMjYuNjQsMCwwLDAtOC42LDEuNDQxVjEyOC43Wm01LjcxNi0xNi4yMzVWOTkuMTFhOS41NzQsOS41NzQsMCwwLDEsMi42OS0uMzg0YzQuMDgyLDAsNi43NzIsMi4zMDUsNi43NzIsNy4xNTcsMCw0LjM3LTIuMTYxLDcuMTU2LTYuMzg4LDcuMTU2QTcuOTcsNy45NywwLDAsMSwzMjQuMTM5LDExMi40NjNabTE4LjY3NCw0Ljg1MWg1LjU3Mmw3LjEwOS0xMC4yMzFjMS4zNDUtMS45MjEsMi40LTMuNywzLjAyNi00Ljc1NWgwLjFjLTAuMSwxLjM0NS0uMTkyLDMuMDc0LTAuMTkyLDQuOXYxMC4wODdoNS42MTlWOTQuNmgtNS41NzFsLTcuMTA5LDEwLjIzMWMtMS4zLDEuOTIxLTIuNCwzLjctMy4wMjYsNC43NTVoLTAuMWMwLjEtMS4zNDUuMTkyLTMuMDc0LDAuMTkyLTQuOVY5NC42aC01LjYydjIyLjcxOVptMjUuNjg3LDBoNS43MTZWMTA3LjloMy40MWMwLjY3MiwwLDEuMy42MjQsMS45NjksMi4xNjFsMi44ODIsNy4yNTNoNi4ybC00LjEzLTguNjk0YTQuODc4LDQuODc4LDAsMCwwLTIuNjQyLTIuNzg1di0wLjFjMS45MjEtMS4xNTIsMi4xMTMtNC40MTgsMy4yNjYtNmExLjkxOSwxLjkxOSwwLDAsMSwxLjU4NS0uNzIxLDMuODU4LDMuODU4LDAsMCwxLDEuMy4xOTJWOTQuMzU1YTguMiw4LjIsMCwwLDAtMi4zNTQtLjMzNiw0LjgwOSw0LjgwOSwwLDAsMC00LjE3OCwyLjAxN2MtMS44NzQsMi43MzgtMS44MjYsNy40OTMtNC42Niw3LjQ5M2gtMi42NDFWOTQuNkgzNjguNXYyMi43MTlabTMyLjk4OCwwLjQ4YTE0LjIxNCwxNC4yMTQsMCwwLDAsNy43ODEtMi4yMDlsLTEuNjgxLTMuOTM5YTEwLjQ4OCwxMC40ODgsMCwwLDEtNS4yODMsMS41MzdjLTMuODkxLDAtNi40MzctMi41NDUtNi40MzctNy4yLDAtNC4xNzksMi41LTcuMzQ5LDYuNzI1LTcuMzQ5YTguOTQyLDguOTQyLDAsMCwxLDUuNTIzLDEuNzc3Vjk1LjU1NmExMS40MzMsMTEuNDMzLDAsMCwwLTYuMS0xLjUzNywxMS43NDEsMTEuNzQxLDAsMCwwLTEyLjAwOCwxMi4xQzM5MC4wMDgsMTEyLjcsMzk0LjA5MSwxMTcuNzk0LDQwMS40ODgsMTE3Ljc5NFoiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0xNzguNjI1IC04NS4zNzUpIi8+PC9zdmc+); }
+
+		.wrap.ua .buslogo { background-image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMzEuODQ0IiBoZWlnaHQ9IjQ0LjY1NyIgdmlld0JveD0iMCAwIDEzMS44NDQgNDQuNjU3Ij4gIDxkZWZzPiAgICA8c3R5bGU+ICAgICAgLmNscy0xIHsgICAgICAgIGZpbGw6ICNmZmY7ICAgICAgICBmaWxsLXJ1bGU6IGV2ZW5vZGQ7ICAgICAgfSAgICA8L3N0eWxlPiAgPC9kZWZzPiAgPHBhdGggaWQ9ItCRadGC0YBp0LrRgSIgY2xhc3M9ImNscy0xIiBkPSJNMTg2Ljg3NCwxMTIuNTU5di05Ljk0M2gyLjRhMTAuNTcxLDEwLjU3MSwwLDAsMSw1LjE0Ljk2MSw0LjI0Miw0LjI0MiwwLDAsMSwyLjAxNyw0LjAzNWMwLDMuMzYyLTIuMDY1LDQuOTQ3LTYuNzcyLDQuOTQ3aC0yLjc4NlptLTUuODEyLDQuNzU1aDguNDU0YzkuMzY2LDAsMTIuNzc2LTQuMTMxLDEyLjc3Ni05Ljg0NiwwLTMuODkxLTEuNjMzLTYuNDg1LTQuNDY3LTcuOTc0LTIuMjU3LTEuMi01LjE4Ny0xLjU4NS04LjY0Ni0xLjU4NWgtMi4zMDVWOTAuMzY4aDEyLjY4bDEuNTM3LTQuNzA3SDE4MS4wNjJ2MzEuNjUzWm0yNS4wNjEsMGg1Ljc2NFY5NC42aC01Ljc2NHYyMi43MTlaTTIwOS4wMDUsOTAuOWEzLjQzNSwzLjQzNSwwLDEsMC0zLjUwNi0zLjQxQTMuMzg2LDMuMzg2LDAsMCwwLDIwOS4wMDUsOTAuOVptMTIuNTMyLDI2LjQxN2g1LjcxNlY5OS4zNWg2LjcyNGwxLjQ4OS00Ljc1NUgyMTQuNjJWOTkuMzVoNi45MTd2MTcuOTY0Wk0yMzcuNTIzLDEyOC43aDUuNzE1VjExNy4yNjZhMTIuMTYyLDEyLjE2MiwwLDAsMCwzLjUwNy41MjhjNy4xMDgsMCwxMS44MTYtNC45NDcsMTEuODE2LTExLjkxMSwwLTcuMjUzLTQuMjc1LTExLjg2NC0xMi40NDEtMTEuODY0YTI2LjYyOSwyNi42MjksMCwwLDAtOC42LDEuNDQxVjEyOC43Wm01LjcxNS0xNi4yMzVWOTkuMTFhOS41NzQsOS41NzQsMCwwLDEsMi42OS0uMzg0YzQuMDgzLDAsNi43NzMsMi4zMDUsNi43NzMsNy4xNTcsMCw0LjM3LTIuMTYyLDcuMTU2LTYuMzg5LDcuMTU2QTcuOTczLDcuOTczLDAsMCwxLDI0My4yMzgsMTEyLjQ2M1ptMTguNjc1LDQuODUxaDUuNzY0Vjk0LjZoLTUuNzY0djIyLjcxOVpNMjY0LjgsOTAuOWEzLjQzNSwzLjQzNSwwLDEsMC0zLjUwNy0zLjQxQTMuMzg2LDMuMzg2LDAsMCwwLDI2NC44LDkwLjlabTcuMzQ0LDI2LjQxN2g1LjcxNlYxMDcuOWgzLjQxYzAuNjczLDAsMS4zLjYyNCwxLjk2OSwyLjE2MWwyLjg4Miw3LjI1M2g2LjJsLTQuMTMtOC42OTRhNC44NzgsNC44NzgsMCwwLDAtMi42NDItMi43ODV2LTAuMWMxLjkyMS0xLjE1MiwyLjExMy00LjQxOCwzLjI2Ni02YTEuOTE5LDEuOTE5LDAsMCwxLDEuNTg1LS43MjEsMy44NTgsMy44NTgsMCwwLDEsMS4zLjE5MlY5NC4zNTVhOC4yLDguMiwwLDAsMC0yLjM1NC0uMzM2LDQuODA5LDQuODA5LDAsMCwwLTQuMTc4LDIuMDE3Yy0xLjg3NCwyLjczOC0xLjgyNiw3LjQ5My00LjY1OSw3LjQ5M2gtMi42NDJWOTQuNmgtNS43MTZ2MjIuNzE5Wm0zMi45ODgsMC40OGExNC4yMTQsMTQuMjE0LDAsMCwwLDcuNzgxLTIuMjA5bC0xLjY4MS0zLjkzOWExMC40ODgsMTAuNDg4LDAsMCwxLTUuMjgzLDEuNTM3Yy0zLjg5MSwwLTYuNDM3LTIuNTQ1LTYuNDM3LTcuMiwwLTQuMTc5LDIuNS03LjM0OSw2LjcyNS03LjM0OWE4Ljk0Nyw4Ljk0NywwLDAsMSw1LjUyNCwxLjc3N1Y5NS41NTZhMTEuNDQsMTEuNDQsMCwwLDAtNi4xLTEuNTM3LDExLjc0LDExLjc0LDAsMCwwLTEyLjAwNywxMi4xQzI5My42NDgsMTEyLjcsMjk3LjczLDExNy43OTQsMzA1LjEyNywxMTcuNzk0WiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTE4MS4wNjIgLTg0LjAzMSkiLz48L3N2Zz4=); }
+
+		.content {
+			z-index: 10;
+			position: relative;
+			margin-bottom: 20px;
+		}
+
+		.content-container {
+			z-index: 10;
+			max-width: 727px;
+			margin: 0 auto;
+			padding: 28px 25px 25px;
+			border-radius: 11px;
+			box-shadow: 0 4px 20px 0 rgba(6, 54, 70, .15);
+			box-sizing: border-box;
+			text-align: center;
+			background-color: #fff;
+			position: relative;
+		}
+
+		.content-block {
+			position: relative;
+			z-index: 10;
+		}
+
+		hr {
+			margin: 79px 0 45px;
+			border: none;
+			height: 1px;
+			background: #f2f2f2;
+		}
+
+		h1.content-header {
+			color: #2fc6f7;
+			font: 500 40px/45px "Helvetica Neue", Helvetica, Arial, sans-serif;
+			margin-bottom: 13px;
+			margin-top: 62px;
+		}
+
+		h2.content-header {
+			color: #2fc6f7;
+			font: 400 27px/27px "Helvetica Neue", Helvetica, Arial, sans-serif;
+			margin-bottom: 13px;
+			margin-top: 31px;
+		}
+
+		h3.content-header {
+			color: #000;
+			font: 400 30px/41px "Helvetica Neue", Helvetica, Arial, sans-serif;
+			margin-bottom: 40px;
+			margin-top: 46px;
+		}
+
+		.content-logo {
+			width: 100%;
+			height: 57px;
+			background-repeat: no-repeat;
+			background-position: center 0;
+		}
+
+		.wrap.de .content-logo,
+		.wrap.en .content-logo{ background-image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMzIiIGhlaWdodD0iNDUiIHZpZXdCb3g9IjAgMCAyMzIgNDUiPiAgPGcgZmlsbD0ibm9uZSIgZmlsbC1ydWxlPSJldmVub2RkIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSguMDk3IC4wMjIpIj4gICAgPGcgZmlsbD0iIzJGQzdGNyIgZmlsbC1ydWxlPSJub256ZXJvIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgwIDIuNzAxKSI+ICAgICAgPHBhdGggZD0iTS43NjA1OTI0OTEgMy4wOTYyOTc4OUwxMi45NzU1MDY0IDMuMDk2Mjk3ODlDMjEuNDE2MTQ5MiAzLjA5NjI5Nzg5IDI1LjE5MDQyMDMgNy45MDIxMDAzNyAyNS4xOTA0MjAzIDEyLjc2NDE3NjkgMjUuMTkwNDIwMyAxNS44OTMwMTMyIDIzLjYwMDY1MTYgMTguOTU0MzIwNiAyMC41OTI2NzE4IDIwLjQ2MjQ2NDdMMjAuNTkyNjcxOCAyMC41NzUwMTI4QzI1LjI1OTA0MzUgMjEuNzkwNTMxOSAyNy44NTUyODQ1IDI1LjQ5MzM2MzMgMjcuODU1Mjg0NSAyOS43ODE0NDQ3IDI3Ljg1NTI4NDUgMzUuNTY2NDE1NCAyMy4yNTc1MzYgNDEuMjM4ODM4IDE0LjA1MDYwMTggNDEuMjM4ODM4TC43NzIwMjk2NzcgNDEuMjM4ODM4Ljc3MjAyOTY3NyAzLjA5NjI5Nzg5Ljc2MDU5MjQ5MSAzLjA5NjI5Nzg5ek0xMS45MTE4NDgyIDE4LjY2MTY5NTZDMTUuNDU3Mzc1NiAxOC42NjE2OTU2IDE3LjI3NTg4ODEgMTYuNjkyMTA0NSAxNy4yNzU4ODgxIDE0LjIwNDc5MjIgMTcuMjc1ODg4MSAxMS42MDQ5MzE4IDE1LjUwMzEyNDQgOS41NzkwNjY1OCAxMS43Mjg4NTMyIDkuNTc5MDY2NThMOC44MzUyNDUzMyA5LjU3OTA2NjU4IDguODM1MjQ1MzMgMTguNjYxNjk1NiAxMS45MTE4NDgyIDE4LjY2MTY5NTZ6TTEyLjk3NTUwNjQgMzQuNzQ0ODE0NUMxNy40NTg4ODMxIDM0Ljc0NDgxNDUgMTkuNzAwNTcxNCAzMy4yMzY2NzA0IDE5LjcwMDU3MTQgMjkuNzcwMTg5OSAxOS43MDA1NzE0IDI2LjgyMTQzMDUgMTcuNDU4ODgzMSAyNS4xNDQ0NjQzIDEzLjc0MTc5NzggMjUuMTQ0NDY0M0w4LjgzNTI0NTMzIDI1LjE0NDQ2NDMgOC44MzUyNDUzMyAzNC43NTYwNjkzIDEyLjk3NTUwNjQgMzQuNzU2MDY5MyAxMi45NzU1MDY0IDM0Ljc0NDgxNDV6TTMxLjc4OTY3NjMgNS40MDM1MzMyN0MzMS43ODk2NzYzIDIuOTE2MjIwOTggMzMuODU5ODA2OC44OTAzNTU3NjEgMzYuNjI3NjA1Ny44OTAzNTU3NjEgMzkuMzM4MjE4Ni44OTAzNTU3NjEgNDEuNDA4MzQ5MSAyLjgwMzY3MjkxIDQxLjQwODM0OTEgNS40MDM1MzMyNyA0MS40MDgzNDkxIDcuOTQ3MTE5NiAzOS4zMzgyMTg2IDEwLjAyOTI1ODkgMzYuNjI3NjA1NyAxMC4wMjkyNTg5IDMzLjg1OTgwNjggMTAuMDQwNTEzNyAzMS43ODk2NzYzIDguMDE0NjQ4NDQgMzEuNzg5Njc2MyA1LjQwMzUzMzI3ek0zMi42MTMxNTM2IDEzLjg1NTg5MzJMNDAuNTczNDM0NiAxMy44NTU4OTMyIDQwLjU3MzQzNDYgNDEuMjI3NTgzMiAzMi42MTMxNTM2IDQxLjIyNzU4MzIgMzIuNjEzMTUzNiAxMy44NTU4OTMyek00OC43ODUzMzM3IDM0LjExNDU0NTNMNDguNzg1MzMzNyAxOS45MzM0ODg4IDQzLjY1MDAzNzUgMTkuOTMzNDg4OCA0My42NTAwMzc1IDEzLjg1NTg5MzIgNDguNzg1MzMzNyAxMy44NTU4OTMyIDQ4Ljc4NTMzMzcgNy40MjkzOTg0OSA1Ni44MTQyMzc4IDUuMTY3MTgyMzMgNTYuODE0MjM3OCAxMy44NDQ2MzgzIDY1LjI1NDg4MDUgMTMuODQ0NjM4MyA2My40MjQ5MzA5IDE5LjkyMjIzNCA1Ni44MTQyMzc4IDE5LjkyMjIzNCA1Ni44MTQyMzc4IDMyLjEzMzY5OTNDNTYuODE0MjM3OCAzNC42NzcyODU3IDU3LjYzNzcxNTEgMzUuNTQzOTA1OCA1OS40Njc2NjQ4IDM1LjU0MzkwNTggNjEuMDAwMjQ3NiAzNS41NDM5MDU4IDYyLjUzMjgzMDQgMzUuMDI2MTg0NyA2My41OTY0ODg3IDM0LjMyODM4NjZMNjUuODk1MzYyOSAzOS42NTE5MTAyQzYzLjgyNTIzMjQgNDEuMDM2MjUxNSA2MC4xNzY3NzAzIDQxLjc5MDMyMzUgNTcuMzk3NTM0MiA0MS43OTAzMjM1IDUyLjA5MDY4MDIgNDEuODEyODMzMSA0OC43ODUzMzM3IDM4LjkyMDM0NzggNDguNzg1MzMzNyAzNC4xMTQ1NDUzek02OC42NzQ1OTkgMTMuODU1ODkzMkw3NS4zOTk2NjM5IDEzLjg1NTg5MzIgNzYuMjgwMzI3MiAxNi43NDgzNzg1Qzc4LjYzNjM4NzQgMTQuNjA5OTY1MiA4MC44NzgwNzU3IDEzLjE1ODA5NTEgODMuODk3NDkyNiAxMy4xNTgwOTUxIDg1LjI1ODUxNzcgMTMuMTU4MDk1MSA4Ni45MDU0NzI0IDEzLjU2MzI2ODIgODguMTQwNjg4NCAxNC40Mjk4ODgzTDg1LjM3Mjg4OTUgMjAuOTEyNjU3QzgzLjk1NDY3ODYgMjAuMDQ2MDM2OSA4Mi42MDUwOTA3IDE5Ljg2NTk2IDgxLjgyNzM2MjEgMTkuODY1OTYgODAuMTExNzg0MyAxOS44NjU5NiA3OC43NjIxOTY0IDIwLjQzOTk1NTEgNzYuNjM0ODc5OSAyMi4xMjgxNzYxTDc2LjYzNDg3OTkgNDEuMjI3NTgzMiA2OC42NzQ1OTkgNDEuMjI3NTgzMiA2OC42NzQ1OTkgMTMuODU1ODkzMiA2OC42NzQ1OTkgMTMuODU1ODkzMnpNODkuNDQ0NTI3NSA1LjQwMzUzMzI3Qzg5LjQ0NDUyNzUgMi45MTYyMjA5OCA5MS41MTQ2NTgxLjg5MDM1NTc2MSA5NC4yODI0NTY5Ljg5MDM1NTc2MSA5Ni45OTMwNjk4Ljg5MDM1NTc2MSA5OS4wNjMyMDA0IDIuODAzNjcyOTEgOTkuMDYzMjAwNCA1LjQwMzUzMzI3IDk5LjA2MzIwMDQgNy45NDcxMTk2IDk2Ljk5MzA2OTggMTAuMDI5MjU4OSA5NC4yODI0NTY5IDEwLjAyOTI1ODkgOTEuNTAzMjIwOSAxMC4wNDA1MTM3IDg5LjQ0NDUyNzUgOC4wMTQ2NDg0NCA4OS40NDQ1Mjc1IDUuNDAzNTMzMjd6TTkwLjI2ODAwNDkgMTMuODU1ODkzMkw5OC4yMjgyODU4IDEzLjg1NTg5MzIgOTguMjI4Mjg1OCA0MS4yMjc1ODMyIDkwLjI2ODAwNDkgNDEuMjI3NTgzMiA5MC4yNjgwMDQ5IDEzLjg1NTg5MzJ6Ii8+ICAgICAgPHBvbHlnb24gcG9pbnRzPSIxMTEuMzkyIDI3LjQ1MiAxMDEuMTkxIDEzLjg1NiAxMDkuNDQ4IDEzLjg1NiAxMTUuNzA0IDIyLjE4NCAxMjEuOTYgMTMuODU2IDEzMC4yMTggMTMuODU2IDExOS44OSAyNy40NTIgMTMwLjMzMiA0MS4yMjggMTIyLjA2MyA0MS4yMjggMTE1LjYzNiAzMi42NjMgMTA5LjE1MSA0MS4yMjggMTAwLjg5MyA0MS4yMjgiLz4gICAgPC9nPiAgICA8cGF0aCBmaWxsPSIjMjE1Rjk4IiBmaWxsLXJ1bGU9Im5vbnplcm8iIGQ9Ik0xNTMuNzY3MjU4LDE1LjU0NDExNDIgQzE1My43NjcyNTgsMTIuMTMzOTA3NyAxNTAuODk2NTI0LDEwLjkyOTY0MzQgMTQ3Ljg0Mjc5NiwxMC45Mjk2NDM0IEMxNDMuNzQ4MjgzLDEwLjkyOTY0MzQgMTQwLjM5NzE4OCwxMi4yNDY0NTU4IDEzNy4yODYyNzQsMTMuNjE5NTQyMiBMMTM1LjE0NzUyLDcuMzI4MTA1MjMgQzEzOC42MjQ0MjQsNS43NzQ5NDE5IDE0My40NTA5MTcsNC4wMzA0NDY4NSAxNDkuMTkyMzg0LDQuMDMwNDQ2ODUgQzE1OC4xNzA1NzQsNC4wMzA0NDY4NSAxNjIuNTA1MjY3LDguNDY0ODQwNzEgMTYyLjUwNTI2NywxNC42ODg3NDg5IEMxNjIuNTA1MjY3LDI1LjU4MzQwMTggMTQ3LjI0ODA2MiwyOC42NDQ3MDkyIDE0NC42NzQ2OTUsMzYuOTYyMDExNCBMMTYzLjA1NDI1MiwzNi45NjIwMTE0IEwxNjMuMDU0MjUyLDQzLjkwNjIyNzIgTDEzMy44MDkzNjksNDMuOTA2MjI3MiBDMTM1LjQ1NjMyNCwyNC40NjkxNzU5IDE1My43NjcyNTgsMjMuMzMyNDQwNCAxNTMuNzY3MjU4LDE1LjU0NDExNDIgWiIvPiAgICA8cGF0aCBmaWxsPSIjMjE1Rjk4IiBmaWxsLXJ1bGU9Im5vbnplcm8iIGQ9Ik0xNjIuMjMwNzc1LDI5LjMxOTk5NzYgTDE4Mi4zNzE2NTgsNC4xNzY3NTkzNCBMMTg4LjM1MzMwNiw0LjE3Njc1OTM0IEwxODguMzUzMzA2LDI3Ljk0NjkxMTIgTDE5NC4zMzQ5NTQsMjcuOTQ2OTExMiBMMTk0LjMzNDk1NCwzNC41MzA5NzMyIEwxODguMzUzMzA2LDM0LjUzMDk3MzIgTDE4OC4zNTMzMDYsNDMuOTI4NzM2OCBMMTgwLjIzMjkwNSw0My45Mjg3MzY4IEwxODAuMjMyOTA1LDM0LjUzMDk3MzIgTDE2Mi4yMTkzMzgsMzQuNTMwOTczMiBMMTYyLjIxOTMzOCwyOS4zMTk5OTc2IEwxNjIuMjMwNzc1LDI5LjMxOTk5NzYgWiBNMTc2LjU3MzAwNSwyNy45NDY5MTEyIEwxODAuMjMyOTA1LDI3Ljk0NjkxMTIgTDE4MC4yMzI5MDUsMjMuNjkyNTk0MyBDMTgwLjIzMjkwNSwyMC42NDI1NDE2IDE4MC40NzMwODYsMTcuMTA4NTMyMyAxODAuNTk4ODk1LDE2LjMzMTk1MDYgTDE3MS41MDYzMzIsMjguMTI2OTg4MSBDMTcyLjIzODMxMiwyOC4wNTk0NTkzIDE3NS4xNjYyMzIsMjcuOTQ2OTExMiAxNzYuNTczMDA1LDI3Ljk0NjkxMTIgWiIvPiAgICA8cGF0aCBmaWxsPSIjMDA2NkExIiBkPSJNMjE2Ljk5MjAxOCwwLjg0NTMzNjUzNCBDMjA4Ljk2MzExNCwwLjg0NTMzNjUzNCAyMDIuNDY2NzkzLDcuMjQ5MzIxNTggMjAyLjQ2Njc5MywxNS4xMzg5NDExIEMyMDIuNDY2NzkzLDIzLjAyODU2MDcgMjA4Ljk3NDU1MSwyOS40MzI1NDU3IDIxNi45OTIwMTgsMjkuNDMyNTQ1NyBDMjI1LjAyMDkyMiwyOS40MzI1NDU3IDIzMS41MTcyNDQsMjMuMDI4NTYwNyAyMzEuNTE3MjQ0LDE1LjEzODk0MTEgQzIzMS41MTcyNDQsNy4yNDkzMjE1OCAyMjUuMDA5NDg1LDAuODQ1MzM2NTM0IDIxNi45OTIwMTgsMC44NDUzMzY1MzQgWiBNMjE3LjA0OTIwNCwyNi41NTEzMTUyIEMyMTAuNjU1ODE4LDI2LjU1MTMxNTIgMjA1LjQ3NDc3MywyMS40NTI4ODc3IDIwNS40NzQ3NzMsMTUuMTYxNDUwNyBDMjA1LjQ3NDc3Myw4Ljg3MDAxMzc1IDIxMC42NTU4MTgsMy43NzE1ODYyOSAyMTcuMDQ5MjA0LDMuNzcxNTg2MjkgQzIyMy40NDI1OTEsMy43NzE1ODYyOSAyMjguNjIzNjM2LDguODcwMDEzNzUgMjI4LjYyMzYzNiwxNS4xNjE0NTA3IEMyMjguNjIzNjM2LDIxLjQ1Mjg4NzcgMjIzLjQzMTE1NCwyNi41NTEzMTUyIDIxNy4wNDkyMDQsMjYuNTUxMzE1MiBaIE0yMTguMzE4NzMyLDguMjg0NzYzOCBMMjE1LjI5OTMxNSw4LjI4NDc2MzggTDIxNS4yOTkzMTUsMTYuNDQ0NDk4NyBMMjIzLjMxNjc4MiwxNi40NDQ0OTg3IEwyMjMuMzE2NzgyLDEzLjU5NzAzMjYgTDIxOC4zMTg3MzIsMTMuNTk3MDMyNiBMMjE4LjMxODczMiw4LjI4NDc2MzggWiIvPiAgPC9nPjwvc3ZnPg==); }
+
+		.wrap.ru .content-logo { background-image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMDciIGhlaWdodD0iNTkiIHZpZXdCb3g9IjAgMCAzMDcgNTkiPiAgPGcgZmlsbD0ibm9uZSIgZmlsbC1ydWxlPSJldmVub2RkIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtLjQyNiAtLjEyKSI+ICAgIDxwYXRoIGZpbGw9IiMyRkM3RjciIGZpbGwtcnVsZT0ibm9uemVybyIgZD0iTS44NTEyNjAxODcgNS44NjkwMjA2NkwyNi40OTEyMzQxIDUuODY5MDIwNjYgMjQuNDgyNzMxMiAxMi4zOTUxODMyIDguOTY1NjExODEgMTIuMzk1MTgzMiA4Ljk2NTYxMTgxIDIwLjUxMDAyNjIgMTEuNjI4MzEyOCAyMC41MTAwMjYyQzE1LjgyODk1MzEgMjAuNTEwMDI2MiAxOS41NTkwMjk4IDIxLjAzNTc3NjYgMjIuNDYyNzUxMiAyMi41NjczMTA0IDI1Ljg5NDQyMTggMjQuMzI3NDMxMyAyNy45NzE3ODc2IDI3LjUwNDc5MjQgMjcuOTcxNzg3NiAzMi40NDIyNzQzIDI3Ljk3MTc4NzYgMzkuMzc5ODkzNyAyMy43NzExNDczIDQ0LjYwMzEwOTYgMTEuODExOTQ3MyA0NC42MDMxMDk2TC44NjI3MzczNDYgNDQuNjAzMTA5Ni44NjI3MzczNDYgNS44NjkwMjA2Ni44NTEyNjAxODcgNS44NjkwMjA2NnpNMTEuOTg0MTA0NyAzOC4wMTk4MDAzQzE3LjU1MDUyNyAzOC4wMTk4MDAzIDE5Ljg1NzQzNiAzNi4yNTk2Nzk0IDE5Ljg1NzQzNiAzMi41NTY1Njc5IDE5Ljg1NzQzNiAzMC40NDIxMzcgMTkuMDMxMDgwNSAyOC45Njc3NSAxNy42NjUyOTg2IDI4LjE0NDgzNjMgMTYuMTg0NzQ1IDI3LjI2NDc3NTkgMTQuMDQ5OTkzNCAyNy4wMjQ3NTk0IDExLjYyODMxMjggMjcuMDI0NzU5NEw4Ljk2NTYxMTgxIDI3LjAyNDc1OTQgOC45NjU2MTE4MSAzOC4wMTk4MDAzIDExLjk4NDEwNDcgMzguMDE5ODAwMyAxMS45ODQxMDQ3IDM4LjAxOTgwMDN6TTMxLjc1OTI1MDIgMTYuNzk1NDg1NEwzOS41MTc4MDk5IDE2Ljc5NTQ4NTQgMzkuNTE3ODA5OSAyNy45MDQ4MTk4QzM5LjUxNzgwOTkgMzAuMjAyMTIwNSAzOS40NjA0MjQxIDMyLjQzMDg0NSAzOS4yNzY3ODk1IDM0LjAxOTUyNTVMMzkuNDQ4OTQ2OSAzNC4wMTk1MjU1QzQwLjEwMzE0NSAzMi44OTk0NDg2IDQxLjQ1NzQ0OTggMzAuNTU2NDMwNSA0My4wNjQyNTIxIDI4LjI1OTEyOTlMNTEuMDUyMzU1IDE2Ljc5NTQ4NTQgNTguODY4MzAwNSAxNi43OTU0ODU0IDU4Ljg2ODMwMDUgNDQuNTkxNjgwMiA1MS4wNTIzNTUgNDQuNTkxNjgwMiA1MS4wNTIzNTUgMzMuNDgyMzQ1OEM1MS4wNTIzNTUgMzEuMTg1MDQ1MSA1MS4xNjcxMjY2IDI4Ljk1NjMyMDYgNTEuMzUwNzYxMSAyNy4zNjc2NDAxTDUxLjE3ODYwMzcgMjcuMzY3NjQwMUM1MC41MjQ0MDU2IDI4LjQ4NzcxNyA0OS4xMDEyMzc5IDMwLjgzMDczNTEgNDcuNTYzMjk4NSAzMy4xMjgwMzU3TDM5LjU3NTE5NTcgNDQuNTkxNjgwMiAzMS43NTkyNTAyIDQ0LjU5MTY4MDIgMzEuNzU5MjUwMiAxNi43OTU0ODU0IDMxLjc1OTI1MDIgMTYuNzk1NDg1NHoiLz4gICAgPHBvbHlnb24gZmlsbD0iIzJGQzdGNyIgZmlsbC1ydWxlPSJub256ZXJvIiBwb2ludHM9IjcwLjgwNSAyMy4zNzkgNjIuNDYxIDIzLjM3OSA2Mi40NjEgMTYuNzk1IDg4Ljg3IDE2Ljc5NSA4Ni43OTIgMjMuMzc5IDc4LjgwNCAyMy4zNzkgNzguODA0IDQ0LjU5MiA3MC44MTYgNDQuNTkyIDcwLjgxNiAyMy4zNzkiLz4gICAgPHBhdGggZmlsbD0iIzJGQzdGNyIgZmlsbC1ydWxlPSJub256ZXJvIiBkPSJNOTEuMzYwMTM4NCAxNy45MTU1NjIzQzk0LjQzNjAxNzEgMTYuODUyNjMyMiA5OC4yMjM0Nzk3IDE2LjA5ODI5NDcgMTAyLjQzNTU5NyAxNi4wOTgyOTQ3IDExMi44NTY4NTggMTYuMDk4Mjk0NyAxMTguMTI0ODc0IDIxLjkxNTgzNzEgMTE4LjEyNDg3NCAzMC42NzA3MjQxIDExOC4xMjQ4NzQgMzkuMDE0MTU0MyAxMTIuNDQzNjggNDUuMTg2MDA2NyAxMDMuMzc2NzI0IDQ1LjE4NjAwNjcgMTAyLjAxMDk0MiA0NS4xODYwMDY3IDEwMC42NTY2MzcgNDUuMDE0NTY2NCA5OS4zNDgyNDEzIDQ0LjY2MDI1NjNMOTkuMzQ4MjQxMyA1OC41MzU0OTUgOTEuMzYwMTM4NCA1OC41MzU0OTUgOTEuMzYwMTM4NCAxNy45MTU1NjIzIDkxLjM2MDEzODQgMTcuOTE1NTYyM3pNMTAyLjc3OTkxMiAzOC42NTk4NDQyQzEwNy41NzczNjUgMzguNjU5ODQ0MiAxMDkuOTQxNjU5IDM1LjUzOTYyOTkgMTA5Ljk0MTY1OSAzMC42NzA3MjQxIDEwOS45NDE2NTkgMjUuMjY0NjM4NSAxMDYuOTgwNTUyIDIyLjYyNDQ1NzIgMTAyLjA2ODMyOCAyMi42MjQ0NTcyIDEwMS4wNTgzMzggMjIuNjI0NDU3MiAxMDAuMjMxOTgzIDIyLjY4MTYwMzkgOTkuMzQ4MjQxMyAyMi45Nzg3NjcyTDk5LjM0ODI0MTMgMzguMDg4Mzc2NEMxMDAuNDE1NjE3IDM4LjQzMTI1NzEgMTAxLjQyNTYwNyAzOC42NTk4NDQyIDEwMi43Nzk5MTIgMzguNjU5ODQ0MnpNMTIxLjMxNTUyNCAxNi43OTU0ODU0TDEyOS4wNzQwODQgMTYuNzk1NDg1NCAxMjkuMDc0MDg0IDI3LjkwNDgxOThDMTI5LjA3NDA4NCAzMC4yMDIxMjA1IDEyOS4wMTY2OTggMzIuNDMwODQ1IDEyOC44MzMwNjQgMzQuMDE5NTI1NUwxMjkuMDA1MjIxIDM0LjAxOTUyNTVDMTI5LjY1OTQxOSAzMi44OTk0NDg2IDEzMS4wMTM3MjQgMzAuNTU2NDMwNSAxMzIuNjIwNTI2IDI4LjI1OTEyOTlMMTQwLjYwODYyOSAxNi43OTU0ODU0IDE0OC40MjQ1NzQgMTYuNzk1NDg1NCAxNDguNDI0NTc0IDQ0LjU5MTY4MDIgMTQwLjYwODYyOSA0NC41OTE2ODAyIDE0MC42MDg2MjkgMzMuNDgyMzQ1OEMxNDAuNjA4NjI5IDMxLjE4NTA0NTEgMTQwLjcyMzQwMSAyOC45NTYzMjA2IDE0MC45MDcwMzUgMjcuMzY3NjQwMUwxNDAuNzM0ODc4IDI3LjM2NzY0MDFDMTQwLjA4MDY4IDI4LjQ4NzcxNyAxMzguNjU3NTEyIDMwLjgzMDczNTEgMTM3LjExOTU3MyAzMy4xMjgwMzU3TDEyOS4xMzE0NyA0NC41OTE2ODAyIDEyMS4zMTU1MjQgNDQuNTkxNjgwMiAxMjEuMzE1NTI0IDE2Ljc5NTQ4NTR6TTE1My45NDUwODggMTYuNzk1NDg1NEwxNjEuOTMzMTkxIDE2Ljc5NTQ4NTQgMTYxLjkzMzE5MSAyNy40MzYyMTYyIDE2NC44OTQyOTggMjcuNDM2MjE2MkMxNjguMjY4NTgzIDI3LjQzNjIxNjIgMTY4LjE1MzgxMSAyMS43OTAxMTQxIDE3MC42MzI4NzggMTguNDk4NDU5NSAxNzEuNzAwMjU0IDE3LjAyNDA3MjUgMTczLjM1Mjk2NCAxNi4wODY4NjUzIDE3NS45MDA4OTQgMTYuMDg2ODY1MyAxNzYuNzI3MjQ5IDE2LjA4Njg2NTMgMTc4LjIwNzgwMyAxNi4yMDExNTg5IDE3OS4xMDMwMjEgMTYuNDk4MzIyMUwxNzkuMTAzMDIxIDIzLjI1MzA3MThDMTc4LjYzMjQ1OCAyMy4wODE2MzE0IDE3OC4wMzU2NDUgMjIuOTU1OTA4NSAxNzcuNDUwMzEgMjIuOTU1OTA4NSAxNzYuNTY2NTY5IDIyLjk1NTkwODUgMTc1Ljk2OTc1NyAyMy4yNTMwNzE4IDE3NS40OTkxOTMgMjMuODM1OTY4OSAxNzQuMDc2MDI2IDI1LjU5NjA4OTggMTczLjg0NjQ4MiAyOS4xODQ5MDc4IDE3MS43NjkxMTcgMzAuNDc2NDI1TDE3MS43NjkxMTcgMzAuNTkwNzE4NkMxNzMuMTM0ODk4IDMxLjExNjQ2OSAxNzQuMTMzNDExIDMyLjEyMjI1MjQgMTc0Ljk3MTI0NCAzMy44ODIzNzMyTDE4MC4wMDk3MTcgNDQuNTgwMjUwOCAxNzEuMzY3NDE2IDQ0LjU4MDI1MDggMTY4LjA1MDUxNyAzNS44ODI1MTA2QzE2Ny4zMzg5MzMgMzQuMTc5NTM2NSAxNjYuNjI3MzQ5IDMzLjQxMzc2OTYgMTY1Ljg1ODM3OSAzMy40MTM3Njk2TDE2MS45NTYxNDUgMzMuNDEzNzY5NiAxNjEuOTU2MTQ1IDQ0LjU4MDI1MDggMTUzLjk2ODA0MiA0NC41ODAyNTA4IDE1My45NjgwNDIgMTYuNzk1NDg1NCAxNTMuOTQ1MDg4IDE2Ljc5NTQ4NTR6TTE4MS4yMDMzNDEgMzAuODQyMTY0NEMxODEuMjAzMzQxIDIyLjAzMDEzMDYgMTg4LjA2NjY4MyAxNi4wODY4NjUzIDE5Ni4zMDcyODMgMTYuMDg2ODY1MyAyMDAuMDk0NzQ2IDE2LjA4Njg2NTMgMjAyLjU4NTI4OSAxNy4xNDk3OTU0IDIwNC4wNjU4NDMgMTguMDg3MDAyN0wyMDQuMDY1ODQzIDI0LjcyNzQ1ODdDMjAyLjA1NzM0IDIzLjE5NTkyNSAxOTkuOTIyNTg4IDIyLjM3MzAxMTMgMTk3LjIwMjUwMiAyMi4zNzMwMTEzIDE5Mi4yOTAyNzcgMjIuMzczMDExMyAxODkuMzg2NTU2IDI2LjA3NjEyMjggMTg5LjM4NjU1NiAzMC43NzM1ODgzIDE4OS4zODY1NTYgMzYuMDA4MjMzNSAxOTIuMzQ3NjYzIDM4LjgxOTg1NTIgMTk2Ljg0NjcxIDM4LjgxOTg1NTIgMTk5LjMzNzI1MyAzOC44MTk4NTUyIDIwMS4yMzA5ODQgMzguMTExMjM1MSAyMDMuMjk2ODczIDM2LjkzNDAxMTRMMjA1LjU0NjM5NiA0Mi4zNDAwOTdDMjAzLjIzOTQ4NyA0My45ODU5MjQzIDE5OS42MjQxODIgNDUuMTYzMTQ4IDE5NS43MjE5NDggNDUuMTYzMTQ4IDE4Ni40MTM5NzIgNDUuMTg2MDA2NyAxODEuMjAzMzQxIDM5LjAxNDE1NDMgMTgxLjIwMzM0MSAzMC44NDIxNjQ0eiIvPiAgICA8cGF0aCBmaWxsPSIjMjE1Rjk4IiBmaWxsLXJ1bGU9Im5vbnplcm8iIGQ9Ik0yMjkuMjgxMTYyLDE1Ljc3ODI3MjcgQzIyOS4yODExNjIsMTIuMzE1MTc3NyAyMjYuNDAwMzk1LDExLjA5MjIzNjUgMjIzLjMzNTk5MywxMS4wOTIyMzY1IEMyMTkuMjI3MTcsMTEuMDkyMjM2NSAyMTUuODY0MzYzLDEyLjQyOTQ3MTIgMjEyLjc0MjU3NSwxMy44MjM4NTI3IEwyMTAuNTk2MzQ2LDcuNDM0ODQyNDkgQzIxNC4wODU0MDMsNS44NTc1OTEzIDIxOC45Mjg3NjQsNC4wODYwNDEwNSAyMjQuNjkwMjk4LDQuMDg2MDQxMDUgQzIzMy42OTk4NjgsNC4wODYwNDEwNSAyMzguMDQ5NzExLDguNTg5MjA3NDggMjM4LjA0OTcxMSwxNC45MDk2NDE2IEMyMzguMDQ5NzExLDI1Ljk3MzI1ODYgMjIyLjczOTE4MSwyOS4wODIwNDM1IDIyMC4xNTY4MiwzNy41MjgzMzc5IEwyMzguNjAwNjE1LDM3LjUyODMzNzkgTDIzOC42MDA2MTUsNDQuNTgwMjUwOCBMMjA5LjI1MzUxOSw0NC41ODAyNTA4IEMyMTAuOTA2MjMsMjQuODQxNzUyMyAyMjkuMjgxMTYyLDIzLjY3NTk1OCAyMjkuMjgxMTYyLDE1Ljc3ODI3MjcgWiIvPiAgICA8cGF0aCBmaWxsPSIjMjE1Rjk4IiBmaWxsLXJ1bGU9Im5vbnplcm8iIGQ9Ik0yMzcuNzc0MjYsMjkuNzU2Mzc1NiBMMjU3Ljk4NTUzNyw0LjIyMzE5MzMzIEwyNjMuOTg4MDkyLDQuMjIzMTkzMzMgTDI2My45ODgwOTIsMjguMzYxOTk0MSBMMjY5Ljk5MDY0NiwyOC4zNjE5OTQxIEwyNjkuOTkwNjQ2LDM1LjA0ODE2NzYgTDI2My45ODgwOTIsMzUuMDQ4MTY3NiBMMjYzLjk4ODA5Miw0NC41OTE2ODAyIEwyNTUuODM5MzA4LDQ0LjU5MTY4MDIgTDI1NS44MzkzMDgsMzUuMDQ4MTY3NiBMMjM3Ljc2Mjc4MiwzNS4wNDgxNjc2IEwyMzcuNzYyNzgyLDI5Ljc1NjM3NTYgTDIzNy43NzQyNiwyOS43NTYzNzU2IFogTTI1Mi4xNjY2MTcsMjguMzYxOTk0MSBMMjU1LjgzOTMwOCwyOC4zNjE5OTQxIEwyNTUuODM5MzA4LDI0LjA0MTY5NzQgQzI1NS44MzkzMDgsMjAuOTQ0MzQxOCAyNTYuMDgwMzI5LDE3LjM1NTUyMzkgMjU2LjIwNjU3NywxNi41NjY4OTgzIEwyNDcuMDgyMjM2LDI4LjU0NDg2MzggQzI0Ny44MTY3NzQsMjguNDg3NzE3IDI1MC43NTQ5MjcsMjguMzYxOTk0MSAyNTIuMTY2NjE3LDI4LjM2MTk5NDEgWiIvPiAgICA8cGF0aCBmaWxsPSIjMDA2NkExIiBkPSJNMjkyLjcyNjg5OCwwLjg0MDEwMzgzMiBDMjg0LjY2OTkzMywwLjg0MDEwMzgzMiAyNzguMTUwOTA2LDcuMzQzNDA3NjMgMjc4LjE1MDkwNiwxNS4zNTUzODY1IEMyNzguMTUwOTA2LDIzLjM2NzM2NTMgMjg0LjY4MTQxLDI5Ljg3MDY2OTEgMjkyLjcyNjg5OCwyOS44NzA2NjkxIEMzMDAuNzgzODY0LDI5Ljg3MDY2OTEgMzA3LjMwMjg5MSwyMy4zNjczNjUzIDMwNy4zMDI4OTEsMTUuMzU1Mzg2NSBDMzA3LjMwMjg5MSw3LjM0MzQwNzYzIDMwMC43NzIzODcsMC44NDAxMDM4MzIgMjkyLjcyNjg5OCwwLjg0MDEwMzgzMiBaIE0yOTIuNzg0Mjg0LDI2Ljk0NDc1MzkgQzI4Ni4zNjg1NTIsMjYuOTQ0NzUzOSAyODEuMTY5Mzk5LDIxLjc2NzI1NTQgMjgxLjE2OTM5OSwxNS4zNzgyNDUyIEMyODEuMTY5Mzk5LDguOTg5MjM0OTYgMjg2LjM2ODU1MiwzLjgxMTczNjUgMjkyLjc4NDI4NCwzLjgxMTczNjUgQzI5OS4yMDAwMTYsMy44MTE3MzY1IDMwNC4zOTkxNjksOC45ODkyMzQ5NiAzMDQuMzk5MTY5LDE1LjM3ODI0NTIgQzMwNC4zOTkxNjksMjEuNzY3MjU1NCAyOTkuMTg4NTM5LDI2Ljk0NDc1MzkgMjkyLjc4NDI4NCwyNi45NDQ3NTM5IFogTTI5NC4wNTgyNDksOC40MDYzMzc3OCBMMjkxLjAyODI3OSw4LjQwNjMzNzc4IEwyOTEuMDI4Mjc5LDE2LjY5MjYyMTIgTDI5OS4wNzM3NjcsMTYuNjkyNjIxMiBMMjk5LjA3Mzc2NywxMy44MDA5OTQgTDI5NC4wNTgyNDksMTMuODAwOTk0IEwyOTQuMDU4MjQ5LDguNDA2MzM3NzggWiIvPiAgPC9nPjwvc3ZnPg==); }
+
+		.wrap.ua .content-logo { background-image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNzIiIGhlaWdodD0iNTkiIHZpZXdCb3g9IjAgMCAyNzIgNTkiPiAgPGcgZmlsbD0ibm9uZSIgZmlsbC1ydWxlPSJldmVub2RkIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtLjU5NSAtLjA0KSI+ICAgIDxnIGZpbGw9IiMyRkM3RjciIGZpbGwtcnVsZT0ibm9uemVybyIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMCAyLjg2KSI+ICAgICAgPHBhdGggZD0iTS43NzE5NTU3MzMgMy4wMTkzNTgwMUwyNi4yODk1ODk5IDMuMDE5MzU4MDEgMjQuMjkwNjcwNSA5LjU1MDEyMDc4IDguODQ3NTkwMTkgOS41NTAxMjA3OCA4Ljg0NzU5MDE5IDE3LjY3MDY4MzkgMTEuNDk3NTg2MiAxNy42NzA2ODM5QzE1LjY3ODE4MzQgMTcuNjcwNjgzOSAxOS4zOTA0NjIzIDE4LjE5NjgwNDkgMjIuMjgwMzI4NyAxOS43Mjk0MTgzIDI1LjY5NTYyNTMgMjEuNDkwNzc5OCAyNy43NjMwNzkxIDI0LjY3MDM4MDYgMjcuNzYzMDc5MSAyOS42MTEzNDMgMjcuNzYzMDc5MSAzNi41NTM4NTI2IDIzLjU4MjQ4MTkgNDEuNzgwNzUwMyAxMS42ODAzNDQ2IDQxLjc4MDc1MDNMLjc4MzM3ODEzIDQxLjc4MDc1MDMuNzgzMzc4MTMgMy4wMTkzNTgwMS43NzE5NTU3MzMgMy4wMTkzNTgwMXpNMTEuODUxNjgwNSAzNS4xOTI4MDA1QzE3LjM5MTU0MjkgMzUuMTkyODAwNSAxOS42ODc0NDQ2IDMzLjQzMTQzODkgMTkuNjg3NDQ0NiAyOS43MjU3MTcxIDE5LjY4NzQ0NDYgMjcuNjA5Nzk1NyAxOC44NjUwMzIxIDI2LjEzNDM2OTUgMTcuNTA1NzY2OSAyNS4zMTA4NzU3IDE2LjAzMjI3NzcgMjQuNDMwMTk1IDEzLjkwNzcxMTkgMjQuMTkwMDA5MyAxMS40OTc1ODYyIDI0LjE5MDAwOTNMOC44NDc1OTAxOSAyNC4xOTAwMDkzIDguODQ3NTkwMTkgMzUuMTkyODAwNSAxMS44NTE2ODA1IDM1LjE5MjgwMDUgMTEuODUxNjgwNSAzNS4xOTI4MDA1ek0zMS43NzIzNDAzIDUuMzc1NDY1MDdDMzEuNzcyMzQwMyAyLjg0Nzc5NjgyIDMzLjgzOTc5NDEuNzg5MDYyNSAzNi42MDQwMTQxLjc4OTA2MjUgMzkuMzExMTIyMS43ODkwNjI1IDQxLjM3ODU3NTkgMi43MzM0MjI2OSA0MS4zNzg1NzU5IDUuMzc1NDY1MDcgNDEuMzc4NTc1OSA3Ljk2MDMyMDM5IDM5LjMxMTEyMjEgMTAuMDc2MjQxOCAzNi42MDQwMTQxIDEwLjA3NjI0MTggMzMuODM5Nzk0MSAxMC4wNzYyNDE4IDMxLjc3MjM0MDMgOC4wMTc1MDc0NSAzMS43NzIzNDAzIDUuMzc1NDY1MDd6TTMyLjU5NDc1MjkgMTMuOTY0OTYyMkw0MC41NDQ3NDEgMTMuOTY0OTYyMiA0MC41NDQ3NDEgNDEuNzgwNzUwMyAzMi41OTQ3NTI5IDQxLjc4MDc1MDMgMzIuNTk0NzUyOSAxMy45NjQ5NjIyeiIvPiAgICAgIDxwb2x5Z29uIHBvaW50cz0iNTIuNTE1IDIwLjU1MyA0NC4yMTEgMjAuNTUzIDQ0LjIxMSAxMy45NjUgNzAuNDk0IDEzLjk2NSA2OC40MjcgMjAuNTUzIDYwLjQ3NyAyMC41NTMgNjAuNDc3IDQxLjc4MSA1Mi41MjcgNDEuNzgxIDUyLjUyNyAyMC41NTMiLz4gICAgICA8cGF0aCBkPSJNNzMuNDk4MzU1NCAxNS4wNzQzOTEyQzc2LjU1OTU1NzcgMTQuMDEwNzExOCA4MC4zMjg5NDg2IDEzLjI1NTg0MjYgODQuNTIwOTY4MiAxMy4yNTU4NDI2IDk0Ljg5MjUwNDQgMTMuMjU1ODQyNiAxMDAuMTM1Mzg0IDE5LjA3NzQ4NTcgMTAwLjEzNTM4NCAyNy44Mzg1NDQgMTAwLjEzNTM4NCAzNi4xODc4NTU0IDk0LjQ4MTI5ODEgNDIuMzY0MDU4NCA4NS40NTc2MDQ3IDQyLjM2NDA1ODQgODQuMDk4MzM5NSA0Mi4zNjQwNTg0IDgyLjc1MDQ5NjcgNDIuMTkyNDk3MiA4MS40NDgzNDM1IDQxLjgzNzkzNzRMODEuNDQ4MzQzNSA1NS43MjI5NTY2IDczLjQ5ODM1NTQgNTUuNzIyOTU2NiA3My40OTgzNTU0IDE1LjA3NDM5MTIgNzMuNDk4MzU1NCAxNS4wNzQzOTEyek04NC44NjM2NDAxIDM1LjgzMzI5NTZDODkuNjM4MjAxOSAzNS44MzMyOTU2IDkxLjk5MTIxNTYgMzIuNzEwODgxOSA5MS45OTEyMTU2IDI3LjgzODU0NCA5MS45OTEyMTU2IDIyLjQyODY0NzcgODkuMDQ0MjM3MyAxOS43ODY2MDUzIDg0LjE1NTQ1MTUgMTkuNzg2NjA1MyA4My4xNTAyODA2IDE5Ljc4NjYwNTMgODIuMzI3ODY4IDE5Ljg0Mzc5MjQgODEuNDQ4MzQzNSAyMC4xNDExNjUxTDgxLjQ0ODM0MzUgMzUuMjYxNDI1QzgyLjUxMDYyNjQgMzUuNjA0NTQ3NCA4My41MTU3OTczIDM1LjgzMzI5NTYgODQuODYzNjQwMSAzNS44MzMyOTU2ek0xMDMuNTUwNjgxIDUuMzc1NDY1MDdDMTAzLjU1MDY4MSAyLjg0Nzc5NjgyIDEwNS42MTgxMzUuNzg5MDYyNSAxMDguMzgyMzU1Ljc4OTA2MjUgMTExLjA4OTQ2My43ODkwNjI1IDExMy4xNTY5MTcgMi43MzM0MjI2OSAxMTMuMTU2OTE3IDUuMzc1NDY1MDcgMTEzLjE1NjkxNyA3Ljk2MDMyMDM5IDExMS4wODk0NjMgMTAuMDc2MjQxOCAxMDguMzgyMzU1IDEwLjA3NjI0MTggMTA1LjYwNjcxMiAxMC4wNzYyNDE4IDEwMy41NTA2ODEgOC4wMTc1MDc0NSAxMDMuNTUwNjgxIDUuMzc1NDY1MDd6TTEwNC4zNzMwOTQgMTMuOTY0OTYyMkwxMTIuMzIzMDgyIDEzLjk2NDk2MjIgMTEyLjMyMzA4MiA0MS43ODA3NTAzIDEwNC4zNzMwOTQgNDEuNzgwNzUwMyAxMDQuMzczMDk0IDEzLjk2NDk2MjJ6TTExNy45MjAwNTYgMTMuOTY0OTYyMkwxMjUuODcwMDQ0IDEzLjk2NDk2MjIgMTI1Ljg3MDA0NCAyNC42MTMxOTM2IDEyOC44MTcwMjMgMjQuNjEzMTkzNkMxMzIuMTc1MjA3IDI0LjYxMzE5MzYgMTMyLjA2MDk4MyAxOC45NjMxMTE2IDEzNC41MjgyMjEgMTUuNjY5MTM2NyAxMzUuNTkwNTA0IDE0LjE5MzcxMDQgMTM3LjIzNTMyOSAxMy4yNTU4NDI2IDEzOS43NzExMDEgMTMuMjU1ODQyNiAxNDAuNTkzNTEzIDEzLjI1NTg0MjYgMTQyLjA2NzAwMyAxMy4zNzAyMTY3IDE0Mi45NTc5NSAxMy42Njc1ODk0TDE0Mi45NTc5NSAyMC40MjcxMDA0QzE0Mi40ODk2MzEgMjAuMjU1NTM5MiAxNDEuODk1NjY3IDIwLjEyOTcyNzcgMTQxLjMxMzEyNCAyMC4xMjk3Mjc3IDE0MC40MzM2IDIwLjEyOTcyNzcgMTM5LjgzOTYzNSAyMC40MjcxMDA0IDEzOS4zNzEzMTcgMjEuMDEwNDA4NSAxMzcuOTU0OTQgMjIuNzcxNzcwMSAxMzcuNzI2NDkyIDI2LjM2MzExNzcgMTM1LjY1OTAzOCAyNy42NTU1NDU0TDEzNS42NTkwMzggMjcuNzY5OTE5NUMxMzcuMDE4MzAzIDI4LjI5NjA0MDUgMTM4LjAxMjA1MiAyOS4zMDI1MzI4IDEzOC44NDU4ODcgMzEuMDYzODk0NEwxNDMuODYwMzE5IDQxLjc2OTMxMjkgMTM1LjI1OTI1NCA0MS43NjkzMTI5IDEzMS45NTgxODIgMzMuMDY1NDQxN0MxMzEuMjQ5OTkzIDMxLjM2MTI2NzIgMTMwLjU0MTgwNCAzMC41OTQ5NjA1IDEyOS43NzY1MDQgMzAuNTk0OTYwNUwxMjUuODkyODg5IDMwLjU5NDk2MDUgMTI1Ljg5Mjg4OSA0MS43NjkzMTI5IDExNy45NDI5MDEgNDEuNzY5MzEyOSAxMTcuOTQyOTAxIDEzLjk2NDk2MjIgMTE3LjkyMDA1NiAxMy45NjQ5NjIyek0xNDUuNzMzNTkyIDI4LjAyMTU0MjZDMTQ1LjczMzU5MiAxOS4yMDMyOTczIDE1Mi41NjQxODUgMTMuMjU1ODQyNiAxNjAuNzY1NDY2IDEzLjI1NTg0MjYgMTY0LjUzNDg1NyAxMy4yNTU4NDI2IDE2Ny4wMTM1MTcgMTQuMzE5NTIyIDE2OC40ODcwMDYgMTUuMjU3Mzg5OEwxNjguNDg3MDA2IDIxLjkwMjUyNjdDMTY2LjQ4ODA4NyAyMC4zNjk5MTM0IDE2NC4zNjM1MjEgMTkuNTQ2NDE5NiAxNjEuNjU2NDEzIDE5LjU0NjQxOTYgMTU2Ljc2NzYyNyAxOS41NDY0MTk2IDE1My44Nzc3NjEgMjMuMjUyMTQxNCAxNTMuODc3NzYxIDI3Ljk1MjkxODEgMTUzLjg3Nzc2MSAzMy4xOTEyNTMyIDE1Ni44MjQ3MzkgMzYuMDA0ODU2OCAxNjEuMzAyMzE5IDM2LjAwNDg1NjggMTYzLjc4MDk3OSAzNi4wMDQ4NTY4IDE2NS42NjU2NzQgMzUuMjk1NzM3MiAxNjcuNzIxNzA2IDM0LjExNzY4MzdMMTY5Ljk2MDQ5NSAzOS41Mjc1OEMxNjcuNjY0NTk0IDQxLjE3NDU2NzQgMTY0LjA2NjUzOSA0Mi4zNTI2MjEgMTYwLjE4MjkyNCA0Mi4zNTI2MjEgMTUwLjkxOTM2IDQyLjM2NDA1ODQgMTQ1LjczMzU5MiAzNi4xODc4NTU0IDE0NS43MzM1OTIgMjguMDIxNTQyNnoiLz4gICAgPC9nPiAgICA8cGF0aCBmaWxsPSIjMjE1Rjk4IiBmaWxsLXJ1bGU9Im5vbnplcm8iIGQ9Ik0xOTQuNjg5OTg0LDE1Ljc5NDk0ODIgQzE5NC42ODk5ODQsMTIuMzI5NDEyMSAxOTEuODIyOTYzLDExLjEwNTYwODkgMTg4Ljc3MzE4MywxMS4xMDU2MDg5IEMxODQuNjgzOTY1LDExLjEwNTYwODkgMTgxLjMzNzIwMiwxMi40NDM3ODYyIDE3OC4yMzAzMTEsMTMuODM5MTUwNiBMMTc2LjA5NDMyMiw3LjQ0NTYzNjggQzE3OS41NjY3MzEsNS44NjcyNzM4MyAxODQuMzg2OTgyLDQuMDk0NDc0ODMgMTkwLjEyMTAyNSw0LjA5NDQ3NDgzIEMxOTkuMDg3NjA3LDQuMDk0NDc0ODMgMjAzLjQxNjY5NSw4LjYwMDgxNTUxIDIwMy40MTY2OTUsMTQuOTI1NzA0OCBDMjAzLjQxNjY5NSwyNS45OTcxMjA1IDE4OC4xNzkyMTgsMjkuMTA4MDk2OCAxODUuNjA5MTc5LDM3LjU2MDM0NSBMMjAzLjk2NDk3LDM3LjU2MDM0NSBMMjAzLjk2NDk3LDQ0LjYxNzIyODcgTDE3NC43NTc5MDIsNDQuNjE3MjI4NyBDMTc2LjQwMjcyNywyNC44NjQ4MTY2IDE5NC42ODk5ODQsMjMuNzA5NjM3OSAxOTQuNjg5OTg0LDE1Ljc5NDk0ODIgWiIvPiAgICA8cGF0aCBmaWxsPSIjMjE1Rjk4IiBmaWxsLXJ1bGU9Im5vbnplcm8iIGQ9Ik0yMDMuMTQyNTU4LDI5Ljc5NDM0MTYgTDIyMy4yNTczOTgsNC4yNDMxNjExOSBMMjI5LjIzMTMxMiw0LjI0MzE2MTE5IEwyMjkuMjMxMzEyLDI4LjM5ODk3NzIgTDIzNS4yMDUyMjUsMjguMzk4OTc3MiBMMjM1LjIwNTIyNSwzNS4wODk4NjM4IEwyMjkuMjMxMzEyLDM1LjA4OTg2MzggTDIyOS4yMzEzMTIsNDQuNjQwMTAzNSBMMjIxLjEyMTQxLDQ0LjY0MDEwMzUgTDIyMS4xMjE0MSwzNS4wODk4NjM4IEwyMDMuMTMxMTM1LDM1LjA4OTg2MzggTDIwMy4xMzExMzUsMjkuNzk0MzQxNiBMMjAzLjE0MjU1OCwyOS43OTQzNDE2IFogTTIxNy40NjYyNDMsMjguMzg3NTM5OCBMMjIxLjEyMTQxLDI4LjM4NzUzOTggTDIyMS4xMjE0MSwyNC4wNjQxOTc3IEMyMjEuMTIxNDEsMjAuOTY0NjU4OCAyMjEuMzYxMjgsMTcuMzczMzExMiAyMjEuNDg2OTI3LDE2LjU4NDEyOTcgTDIxMi40MDYxMjEsMjguNTcwNTM4NCBDMjEzLjEzNzE1NSwyOC41MTMzNTE0IDIxNi4wNjEyODgsMjguMzg3NTM5OCAyMTcuNDY2MjQzLDI4LjM4NzUzOTggWiIvPiAgICA8cGF0aCBmaWxsPSIjMDA2NkExIiBkPSJNMjU3LjgzMjk5MywwLjg0NjI0OTU2NCBDMjQ5LjgxNDQ3MSwwLjg0NjI0OTU2NCAyNDMuMzI2NTQ5LDcuMzU0MTM3NSAyNDMuMzI2NTQ5LDE1LjM3MTc2MzkgQzI0My4zMjY1NDksMjMuMzg5MzkwNCAyNDkuODI1ODkzLDI5Ljg5NzI3ODMgMjU3LjgzMjk5MywyOS44OTcyNzgzIEMyNjUuODUxNTE1LDI5Ljg5NzI3ODMgMjcyLjMzOTQzNywyMy4zODkzOTA0IDI3Mi4zMzk0MzcsMTUuMzcxNzYzOSBDMjcyLjMzOTQzNyw3LjM1NDEzNzUgMjY1Ljg0MDA5MywwLjg0NjI0OTU2NCAyNTcuODMyOTkzLDAuODQ2MjQ5NTY0IFogTTI1Ny44OTAxMDUsMjYuOTY5MzAwNiBDMjUxLjUwNDk4NSwyNi45NjkzMDA2IDI0Ni4zMzA2NCwyMS43ODgxNTI2IDI0Ni4zMzA2NCwxNS4zOTQ2Mzg4IEMyNDYuMzMwNjQsOS4wMDExMjQ5NiAyNTEuNTA0OTg1LDMuODE5OTc2OTIgMjU3Ljg5MDEwNSwzLjgxOTk3NjkyIEMyNjQuMjc1MjI1LDMuODE5OTc2OTIgMjY5LjQ0OTU3LDkuMDAxMTI0OTYgMjY5LjQ0OTU3LDE1LjM5NDYzODggQzI2OS40NDk1NywyMS43ODgxNTI2IDI2NC4yNjM4MDIsMjYuOTY5MzAwNiAyNTcuODkwMTA1LDI2Ljk2OTMwMDYgWiBNMjU5LjE1Nzk5MSw4LjQxNzgxNjkgTDI1Ni4xNDI0NzgsOC40MTc4MTY5IEwyNTYuMTQyNDc4LDE2LjcwOTk0MTIgTDI2NC4xNDk1NzgsMTYuNzA5OTQxMiBMMjY0LjE0OTU3OCwxMy44MTYyNzU4IEwyNTkuMTU3OTkxLDEzLjgxNjI3NTggTDI1OS4xNTc5OTEsOC40MTc4MTY5IFoiLz4gIDwvZz48L3N2Zz4=); }
+
+		.setup-btn,
+		.content-table input[type="submit"],
+		.content-table input[type="button"]{
+			height: 45px;
+			line-height: 45px;
+			color: #fff;
+			background-color: #b5e00f;
+			padding: 0 45px;
+			text-transform: uppercase;
+			text-decoration: none;
+			font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+			vertical-align: middle;
+			border-radius: 25px;
+			transition: all 250ms ease;
+			display: inline-block;
+			font-size: 15px;
+			border: none;
+			cursor: pointer;
+		}
+
+		.setup-btn:hover {
+			background-color: #9bc40e;
+		}
+
+		.lnk {
+			color: #2fc6f7;
+			font: 15px/25px "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+			border-bottom: 1px solid;
+			text-decoration: none;
+			transition: all 250ms ease;
+		}
+
+		.lnk:hover {
+			border-bottom-color: transparent;
+		}
+
+		.progressbar-container {
+			width: 70%;
+			margin: 55px auto;
+		}
+
+		.progressbar-track {
+			height: 19px;
+			background: #edf2f5;
+			border-radius: 9px;
+			overflow: hidden;
+			position: relative;
+		}
+
+		.progressbar-loader {
+			position: absolute;
+			left: 0;
+			top: 0;
+			bottom: 0;
+			border-radius: 9px;
+			background-image: url(data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQECAgICAgICAgICAgMDAwMDAwMDAwP/2wBDAQEBAQEBAQEBAQECAgECAgMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwP/wgARCAATAEsDAREAAhEBAxEB/8QAGAABAQEBAQAAAAAAAAAAAAAABwYFCAT/xAAcAQEBAQABBQAAAAAAAAAAAAAEBQMAAQIGCAn/2gAMAwEAAhADEAAAAQH3m+e3Sk+lztQmvQKA2wScZcdsfU7NfVzoilWHXPH8zHek3PFnUgpIYmWrJISGUtoMOmVeWoMHFvXlqDCx7txXiSEytSvm4pG6G2ExPpf/xAAjEAACAgEDAwUAAAAAAAAAAAAEBQIDAQAGNBITMhQWIjEz/9oACAEBAAEFAoxtLIYGVo0YIsjS9ysoBrUgODj93teqG1wsEH7taesK2gHHve56e4jrxG1udk0lHiI0Dy5GkqpwXh33TJuHIiqXfO6y8zC5bobh6s4Mfs/jD/sy8AeSy89f/8QAMBEAAQIEAwUFCQAAAAAAAAAAAQACAwQRMRITIRAyNEFxBRRhgcEiIzNCUpGh0eH/2gAIAQMBAT8B1cfEp0cQYGXDumjE4BTExSFlMt6KEAXjFuqbmcbRDFlLUzA51gpuOYpDflClKMdmFd+18MXp+1GmBCIbX2kwktBddRZkMfgadUK0FbozPvMth1XVMmcyJgYdE4hoLjZQZgxXUbbZMcYa1uL2/HLZD43X6uf8Tt1ykOJ+91MfAi3tyXZu/E6eanuHffyXZu5E6+ez/8QAKxEAAQMDAQYFBQAAAAAAAAAAAQACAxESMQQFECEyM0ETNGFx8BQjQoHR/9oACAECAQE/AeDR6BNhMs178JxtaSoIKy+K/wCFSkhhplaWCwmQ5WorYWtyVpYfDBd+RWqq5tgX0fD1tUUBkBPZOADiG4UcF7LzhGleGENP9u9+50FjLn5QBJAGVLCI21Od0HlRSmO3zO6TyhpTl7JvMFreh/FB1o8Z7raHLH7rR9duP2toc7Pbd//EADcQAAADBAQKCgIDAAAAAAAAAAECAwARITEEEjKBExQiIzNBQlJhkQUQQ1FTYnFygsGhsRWTwv/aAAgBAQAGPwICxOtSFZjMx1DREbxYtDowuVMni6YhMTnB66/rEbxBkaMXtD5Rt0gROa4rJdGUXIwxCpuLsUVNwCEPEEHc2SIcMymOFX9hBs/MYMl0akLiwWXdw0Kf3yYKSqD0aG5SMjLdkFw5VzEoZDZmiW+4y5p/1lh6vZTpFUIJPSo7/EMGWcPaQXXtbLg/5XE+OL4rp/bjX4Y1KNsZKfuG0a4v7YY5tLNk/wBGvFlKUeBjhVKO6mETD8h/TKLGlZIHcQtljrGtqBhDd9ULBb/tlFjxOqYR5yAPRoaR1YfMseQfH6beOofmYwsFHRFxqmCKIbxtIp1A6tZPoncd7a6trRBo3VZcY1fywSmE5Xu1NtzLKrVv11WSlbC1Jk7doZuqy5vYktfrLZ8zJ27I2nVZ6na+r//EACUQAAIBBAICAgIDAAAAAAAAAAERACExUWFBcYGRELHR8KHB4f/aAAgBAQABPyEUikMJqRXqwmDc0jgYUCNw7iB6gQO7O9o+YoqyYI2AkNxDHwmIiF6EW+pnHeVQFQkWAvFoDZoEASMoIKvRDsJhQ0O9XscFAAiQoBuQXUbn7iR3H80gztL8dDuUEpyMhdCj+3wBEBECv8JfUGqLFrWDyKnZlBvQwyvyfcH7JF5TeEFBCEK56wjZFI6gXZNWJqakSdkx0psQkBPZUnRIjOTd35z3G+4jL+/fw1lHXEt7uE5fkefZtG0Vf0mC5U/KrlS3OOHHwex5Lx8XnoFe3pRmPWwPyls9fH//2gAMAwEAAgADAAAAEMj0WE70jTz++Bbl/wD/xAAlEQACAQMDAwUBAAAAAAAAAAABEUEAITFRcYEQodFhkbHB4fD/2gAIAQMBAT8QbJLN3NBJMEOcmnmUCb7TQQ2yCtAefNR+FniOaIb6z9D79qAUWXmPNDeftP55ojVsWG8n2+a2MHEv5ih4Bg9h+0X64Ot1zuYrIcL0+/MuZ9qaDKiyp2E0UlAGaJzW3O3T0x8Vu+Szd9Mdzfm+7SGoprDaOE8Q7PR2pMsr1OFZ6uHTWJYPh95WL0sLTLlELWWqa1MQ1lxqr8OliaawmFovV9P/xAAlEQACAQMCBgMBAAAAAAAAAAABEUEAITFRgRBhcaGx0ZHB4fD/2gAIAQIBAT8QwQEDxRSNsztgUsBcCikuEF7vXqpVwh72oIboH2fr5ojNQbT6oJ4ej99UA+M3PTSnhJu8fHejJFtt6FhYVRUP5E0AEuVYFZPb9pXQFDTYdzFDTZFCg4d9hw5ofmnW3g8W4bYf1xrKc0l1JjLWZV1qq0cMcm7jRSqW5BJdu3PNq2TYxiZekZpL8DLSFPXyqadN0zEvV8lw/8QAJBAAAgICAQMEAwAAAAAAAAAAAREAITFBUWGBkXGx8PEQodH/2gAIAQEAAT8QGG4TDsmyJZWmYY0dvgJVQL2mh+AioEtOEjYPKDcPgUi7XLYYBQxOY55zIY5GOhx2HURcAqzGSEi0rgYxCYCcTi8PVIc80PeBGqaDYqbA+RgihgUCk9C0AQQTiffKjg2745gm1fEKqxTUdWFiAoyyEzQigSJA5kLwDdRLSOQEWL6BhWscoSGhRgH1IkQqfLh1ayCxNgeIAi1s4ATS4hgCIeiemGySTBhh3AFs8WW6ULtkmDDlrBcleOJsBqf3l7/lmdgLbdXVdq0pQ5OcnOc76yx8y64vM3E1N2kr9qWsT46WvWfuKiXcPYXydtDpzP8AykWHscovL2tre+LBPanGvbA/qqn4/9k=);
+			background-position: 0 0;
+			background-size: auto 19px;
+			-webkit-animation: progressbar 2s infinite linear;
+			-moz-animation: progressbar 2s infinite linear;
+			-ms-animation: progressbar 2s infinite linear;
+			-o-animation: progressbar 2s infinite linear;
+			animation: progressbar 2s infinite linear;
+		}
+
+		@-webkit-keyframes progressbar { 0 {background-position: 0 0;} 100% {background-position: 75px 0;} }
+		@-moz-keyframes progressbar { 0 {background-position: 0 0;} 100% {background-position: 75px 0;} }
+		@-ms-keyframes progressbar { 0 {background-position: 0 0;} 100% {background-position: 75px 0;} }
+		@-o-keyframes progressbar { 0 {background-position: 0 0;} 100% {background-position: 75px 0;} }
+		@keyframes progressbar { 0 {background-position: 0 0;} 100% {background-position: 75px 0;} }
+
+		.progressbar-counter {
+			padding-top: 10px;
+			color: #000;
+			font: 300 28px/29px "Helvetica Neue", Helvetica, Arial, sans-serif;
+			text-align: center;
+		}
+
+		.lang {
+			vertical-align: middle;
+			text-align: left;
+			box-sizing: border-box;
+			color: #333;
+			font: 12px/22px "Helvetica Neue", Helvetica, Arial, sans-serif;
+			display: block;
+			text-decoration: none;
+			padding: 5px 5px 5px 35px;
+		}
+		.lang:after {
+			background: no-repeat center url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAzCAMAAACpFXjLAAAAk1BMVEX///8TLa4TLq4ULq8bQOccQOc4N2A4N2FAP2VAQGZNTYBOToBOToFXV4dXWIdYWIdYWIhZW4paW4paW4thYY9iYo9iYpCPJR6QJR6uJRKvJRKvJhO/v7/AngDAnwDAwMDBMyzBMy3BNC3CNC3nNRfnNhfnNhjp6O7p6e/p6fD9/f3+/v7/0gD/0wD/1AD///8wMDDKTuTrAAAAAXRSTlMAQObYZgAAARRJREFUeNqtkGFvgyAQhk+n1lW7OV2rRVmFKtoBdv//1+3ARKf2U7PnuDfh8UJyQmW5jAcLLlLK+9wVVPL+h5VAKnA8z8djG8MFxzdmwoEXH+/W+KbthGWUKIgQjRCibRvRYhEgbWtVY4QQJU7gt3HKmDOUhJwJRoltgA1BGIS71yDI8yIvMCDsjt2pS/ZypIJdlnwk6SHmhisvIHjvT/3n7TBtG7xlSZpk8ZXVnDNm3+iPtySaJ9I426dRxGvGasbz7R8rmHmcMyzETsx8y4cTK2CDuwJcb8H/CDosoA+E1oPWJgYMhULpAS/mhmGEVlorxKZGQekXtTEmbPhZ8YwoxILiGUHVAmqFVtMyRszLIdvlfgFLUlmfWPoXcwAAAABJRU5ErkJggg==);
+			content: '';
+			display: block;
+			width:16px;
+			height:12px;
+			position: absolute;
+			top: 50%;
+			left: 12px;
+			margin-top: -6px;
+		}
+		.lang.ru:after{ background-position: 0 0;}
+		.lang.en:after{ background-position: 0 -13px;}
+		.lang.ua:after{ background-position: 0 -26px;}
+		.lang.de:after{ background-position: 0 -39px;}
+		/**/
+		.select-container{
+			border:2px solid #d5dde0;
+			height: 32px;
+			position: absolute;
+			right: 0;
+			bottom: 0;
+			width:50px;
+			border-radius: 2px;
+		}
+
+		.select-container > .select-block,
+		.selected-lang {
+			width:100%;
+			display: block;
+			height: 32px;
+			position: relative;
+			cursor: pointer;
+		}
+
+		.selected-lang:before{
+			content: '';
+			border:4px solid #fff;
+			border-top:4px solid #7e939b;
+			display: block;
+			position: absolute;
+			right: 8px;
+			top: 15px;
+		}
+		.selected-lang:after{
+			left:11px;
+		}
+
+		.select-popup{
+			display: none;
+			position: absolute;
+			top:100%;
+			z-index:100;
+			min-width:100%;
+			border-radius:2px;
+			padding:5px 0;
+			background-color: #fff;
+			box-shadow: 0 5px 5px rgba(0,0,0,.4);
+		}
+		.select-lang-item{
+			height: 32px;
+			width:100%;
+			position: relative;
+			padding:0 10px;
+			box-sizing: border-box;
+			transition: 220ms all ease;
+		}
+		.select-lang-item:hover{
+			background-color: #f3f3f3;
+		}
+		.sub-header{
+			font-size:21px;
+			font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+			text-align: left;
+			margin-bottom: 10px;
+		}
+
+		.select-version-container{
+			padding: 10px 20px 20px;
+			text-align: left;
+			font-size:16px;
+			line-height:25px;
+			font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+		}
+
+		.content-table {
+			text-align: left;
+			font-size:16px;
+			font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+			width: 100%;
+		}
+
+		.input-license-container input,
+		.content-table input[type="text"],
+		.content-table input[type="password"],
+		.content-table select{
+			/*width:100%;*/
+			box-sizing: border-box;
+			border: 2px solid #e0e6e9;
+			border-radius:3px;
+			font-size:15px;
+			padding: 10px;
+			outline: none !important;
+		}
+		.input-license-container{
+			padding-bottom:40px;
+		}
+
+		.div-tool
+		{
+			border:1px solid #CCCCCC;
+			padding:10px;
+			margin: 10px;
+		}
+		.t_div
+		{
+			padding:5px;
+		}
 	</style>
-	<form name="restore" id="restore" action="restore.php" enctype="multipart/form-data" method="POST" onsubmit="this.action='restore.php?lang=<?=LANG?>&'+strAdditionalParams">
-	<input type="hidden" name="lang" value="<?=LANG?>">
-	<script language="JavaScript">
-		var strAdditionalParams = '';
+	<script>
+		var frm;
 		function reloadPage(val, lang, delay)
 		{
-			document.getElementById('restore').action='restore.php?lang=<?=LANG?>&Step=' + val + strAdditionalParams;
-			if (null!=delay)
-				window.setTimeout("document.getElementById('restore').submit()",1000);
-			else
-				document.getElementById('restore').submit();
+			frm = document.forms.restore;
+			frm.Step.value = val;
+			window.setTimeout(function() {frm.submit()}, delay == null ? 0 : 1000);
 		}
-	</script>
-	<table width=100% height=100%><tr><td align=center valign=middle>
-	<table align="center" cellspacing=0 cellpadding=0 border=0 style="width:601px;height:387px">
-		<tr>
-			<td width=11><div style="background:#FFF url(<?=img('corner_top_left.gif')?>);width:11px;height:57px"></td>
-			<td height=57 bgcolor="#FFFFFF" valign="middle">
-				<table cellpadding=0 cellspacing=0 border=0 width=100%><tr>
-					<td align=left style="font-size:14pt;color:#E11537;padding-left:25px"><?=$ar['TITLE']?></td>
-					<td align=right>
-						<?
-						$arLang = array();
-						foreach(array('en') as $l)
-							$arLang[] = LANG == $l ? "<span style='color:grey'>$l</span>" : "<a href='?lang=$l' style='color:black'>$l</a>";
-#						echo implode(' | ',$arLang);
-						?>
-					</td>
-				</tr></table>
 
-			</td>
-			<td width=11><div style="background:#FFF url(<?=img('corner_top_right.gif')?>);width:11px;height:57px"></td>
-		</tr>
-		<tr>
-			<td bgcolor="#FFFFFF">&nbsp;</td>
-			<td height=1 bgcolor="#FFFFFF"><hr size="1px" color="#D6D6D6"></td>
-			<td bgcolor="#FFFFFF">&nbsp;</td>
-		</tr>
-		<tr>
-			<td bgcolor="#FFFFFF">&nbsp;</td>
-			<td bgcolor="#FFFFFF" style="padding:10px;font-size:10pt" valign="<?=$ar['TEXT_ALIGN']?$ar['TEXT_ALIGN']:'top'?>"><?=$ar['TEXT']?></td>
-			<td bgcolor="#FFFFFF">&nbsp;</td>
-		</tr>
-		<tr>
-			<td bgcolor="#FFFFFF">&nbsp;</td>
-			<td bgcolor="#FFFFFF" style="padding:20x;font-size:10pt" valign="middle" align="right" height="40px"><?=$ar['BOTTOM']?></td>
-			<td bgcolor="#FFFFFF">&nbsp;</td>
-		</tr>
-		<tr>
-			<td><div style="background:#FFF url(<?=img('corner_bottom_left.gif')?>);width:11;height:23"></td>
-			<td height=23 bgcolor="#FFFFFF" background="<?=img('bottom_fill.gif')?>"></td>
-			<td><div style="background:#FFF url(<?=img('corner_bottom_right.gif')?>);width:11;height:23"></td>
-		</tr>
-	</table>
-	<div style="background:url(<?=img('logo_'.(LANG=='ru'?'':'en_').'installer.gif')?>); width:95; height:34">
-	</td></tr></table>
-	</form>
+		function addFileField()
+		{
+			var input = document.createElement('input');
+			input.type = 'file';
+			input.name = 'archive[]';
+			input.size = 40;
+			input.onchange = addFileField;
+			input.multiple = true;
+
+			var div = document.getElementById('div2');
+			div.appendChild(input);
+		}
+
+		function div_show(i)
+		{
+			document.getElementById('start_button').disabled = i == 0;
+			for(j=0;j<=4;j++)
+			{
+				if (ob = document.getElementById('div' + j))
+					ob.style.display = i == j ? 'block' : 'none';
+			}
+
+			arSources = [ 'bitrixcloud','download','upload','local','dump' ];
+			document.forms.restore.source.value = arSources[i];
+
+			if (i == 2)
+				document.forms.restore.action = '/restore.php?lang=<?=LANG?>&Step=2&source=' + arSources[i];
+		}
+
+		function LoadFileList()
+		{
+			xml = new XMLHttpRequest(); // forget IE6
+
+			xml.onreadystatechange = function ()
+			{
+				if (xml.readyState == 4)
+				{
+					str = xml.responseText;
+					document.getElementById('file_list').innerHTML = str;
+					document.getElementById('start_button').disabled = !/<select/.test(str);
+				}
+			}
+
+			xml.open('POST', '/restore.php', true);
+			query = 'LoadFileList=Y&lang=<?=LANG?>&bitrixcloud_backup=<?=htmlspecialcharsbx($_REQUEST['bitrixcloud_backup'])?>&license_key=' + document.getElementById('license_key').value;
+
+			xml.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+			xml.send(query);
+		}
+
+		<?
+		if ($_REQUEST['arc_down_url'])
+		{
+			?>
+			window.onload = div_show(1);
+			<?
+		}
+		elseif ($_REQUEST['bitrixcloud_backup'])
+		{
+			?>
+			window.onload = function() {
+				div_show(0);
+				LoadFileList();
+			}
+			<?
+		}
+		?>
+	</script>
+	<div class="wrap <?=LANG?>">
+		<form name="restore" name="restore" action="restore.php" enctype="multipart/form-data" method="POST">
+			<input type="hidden" name="lang" value="<?=LANG?>">
+			<input type="hidden" name="source">
+			<input type="hidden" name="Step" value="<?=$Step?>">
+
+			<header class="header">
+				<?if ($isCrm):?>
+					<a href="" target="_blank" class="logo-link"><span class="logo <?=LANG?>"></span></a>
+				<?else:?>
+					<a href="" target="_blank" class="buslogo-link"><span class="buslogo <?=LANG?>"></span></a>
+				<?endif?>
+			</header>
+
+			<section class="content">
+				<div class="content-container">
+					<table class="content-table">
+						<tr>
+							<td valign="middle">
+								<table cellpadding=0 cellspacing=0 border=0 width=100%><tr>
+									<td align=left >
+										<h3 class="content-header" style="margin: 0;padding: 0;text-align: left;"><?=$ar['TITLE']?></h3>
+										<hr style="margin: 15px 0;">
+									</td>
+									<td align=right>
+										<?
+										$arLang = array();
+										foreach(array('en') as $l)
+											$arLang[] = LANG == $l ? "<span style='color:grey'>$l</span>" : "<a href='?lang=$l' style='color:black'>$l</a>";
+				#						echo implode(' | ',$arLang);
+										?>
+									</td>
+								</tr></table>
+
+							</td>
+						</tr>
+						<tr>
+							<td style="padding:10px;font-size:10pt" valign="<?=$ar['TEXT_ALIGN']?$ar['TEXT_ALIGN']:'top'?>">
+								<?=$ar['TEXT']?>
+							</td>
+						</tr>
+						<tr>
+							<td style="font-size:10pt" align="center" valign="middle"  height="40px"><?=$ar['BOTTOM']?></td>
+						</tr>
+					</table>
+
+					<div class="content-block">
+						<div class="select-container" onclick="document.getElementById('lang-popup').style.display = document.getElementById('lang-popup').style.display == 'block' ? 'none' : 'block'">
+							<label for="ss"><span class="selected-lang lang <?=LANG?>"></span></label>
+							<div class="select-popup" id="lang-popup">
+								<?
+								foreach(array('en','de','ru') as $l)
+								{
+									?>
+									<div class="select-lang-item">
+										<a href="?lang=<?=$l?>" class="lang <?=$l?>"><?=$l?></a>
+									</div>
+									<?
+								}
+								?>
+							</div>
+						</div>
+					</div>
+				</div>
+			</section>
+			<div class="cloud-layer">
+				<div class="cloud cloud-1 cloud-fill"></div>
+				<div class="cloud cloud-2 cloud-border"></div>
+				<div class="cloud cloud-3 cloud-border"></div>
+				<div class="cloud cloud-4 cloud-border"></div>
+				<div class="cloud cloud-5 cloud-border"></div>
+				<div class="cloud cloud-6 cloud-border"></div>
+			</div>
+		</form>
+	</div>
+	</body></html>
 <?
 }
 
@@ -1688,18 +2368,18 @@ function SetCurrentProgress($cur,$total=0,$red=true)
 		$val = 99;
 
 	$status = '
-	<div align=center style="padding:10px;font-size:18px">'.$val.'%</div>
-	<table width=100% cellspacing=0 cellpadding=0 border=0 style="border:1px solid #D8D8D8">
-	<tr>
-		<td style="width:'.$val.'%;height:13px" bgcolor="'.($red?'#FF5647':'#54B4FF').'" background="'.img(($red?'red':'blue').'_progress.gif').'"></td>
-		<td style="width:'.(100-$val).'%"></td>
-	</tr>
-	</table>';
+	<div class="progressbar-container">
+		<div class="progressbar-track">
+			<div class="progressbar-loader" style="width:'.$val.'%"></div>
+		</div>
+		<div class="progressbar-counter">'.$val.'%</div>
+	</div>';
 }
 
-function LoadFile($strRealUrl, $strFilename, $arHeaders = array())
+function LoadFile($strRealUrl, $strFilename, $arHeaders = array(), $customHost = '')
 {
-	global $proxyaddr, $proxyport, $strUserAgent, $replycode;
+	global $proxyaddr, $proxyport, $strUserAgent, $replycode, $debug;
+	$ssl = preg_match('#^https://#i', $strRealUrl);
 
 	$iStartSize = 0;
 	if (file_exists($strFilename.".tmp"))
@@ -1707,10 +2387,10 @@ function LoadFile($strRealUrl, $strFilename, $arHeaders = array())
 
 	$parsedurl = parse_url($strRealUrl);
 	$strOriginalFile = basename($parsedurl['path']);
+	SetCurrentStatus(str_replace("#DISTR#", $strOriginalFile, LoaderGetMessage("LOADER_LOAD_QUERY_DISTR")));
 
 	do
 	{
-		SetCurrentStatus(str_replace("#DISTR#", $strRealUrl, LoaderGetMessage("LOADER_LOAD_QUERY_DISTR")));
 
 		$lasturl = $strRealUrl;
 		$redirection = "";
@@ -1730,11 +2410,13 @@ function LoadFile($strRealUrl, $strFilename, $arHeaders = array())
 			$port = $proxyport;
 			$hostname = $parsedurl["host"];
 		}
+		if ($customHost)
+			$host = $customHost;
 		SetCurrentStatus(str_replace("#HOST#", $host, LoaderGetMessage("LOADER_LOAD_CONN2HOST")));
 
-		$port = $port ? $port : "80";
+		$port = $port ? $port : ($ssl ? 443 : 80);
 
-		$sockethandle = @fsockopen($host, $port, $error_id, $error_msg, 10);
+		$sockethandle = fsockopen(($ssl ? 'ssl://' : '').$host, $port, $error_id, $error_msg, 10);
 		if (!$sockethandle)
 		{
 			SetCurrentStatus(str_replace("#HOST#", $host, LoaderGetMessage("LOADER_LOAD_NO_CONN2HOST"))." [".$error_id."] ".$error_msg);
@@ -1742,6 +2424,9 @@ function LoadFile($strRealUrl, $strFilename, $arHeaders = array())
 		}
 		else
 		{
+			if ($debug)
+				file_put_contents($_SERVER['DOCUMENT_ROOT'].'/log.txt',"\n======\nConnected to ".($ssl ? 'ssl://' : '')."$host:$port\n", 8);
+
 			if (!$parsedurl["path"])
 				$parsedurl["path"] = "/";
 
@@ -1776,6 +2461,8 @@ function LoadFile($strRealUrl, $strFilename, $arHeaders = array())
 			}
 			fclose($sockethandle);
 
+			if ($debug)
+				file_put_contents($_SERVER['DOCUMENT_ROOT'].'/log.txt',"\n======\n".$request."\n\n".$replyheader, 8);
 			$ar_replyheader = explode("\r\n", $replyheader);
 
 			$replyproto = "";
@@ -1804,7 +2491,7 @@ function LoadFile($strRealUrl, $strFilename, $arHeaders = array())
 			$strAcceptRanges = "";
 			foreach ($ar_replyheader as $i => $headerLine)
 			{
-				if (strpos($headerLine, "Location") !== false)
+				if (strpos($headerLine, "Location") === 0)
 					$strLocationUrl = trim(substr($headerLine, strpos($headerLine, ":") + 1, strlen($headerLine) - strpos($headerLine, ":") + 1));
 				elseif (strpos($headerLine, "Content-Length") !== false)
 					$iNewRealSize = IntVal(Trim(substr($headerLine, strpos($headerLine, ":") + 1, strlen($headerLine) - strpos($headerLine, ":") + 1)));
@@ -1816,10 +2503,11 @@ function LoadFile($strRealUrl, $strFilename, $arHeaders = array())
 			{
 				$redirection = $strLocationUrl;
 				$redirected = true;
-				if ((strpos($redirection, "http://")===false))
+				if (!preg_match('#^https?://#', $redirection))
 					$strRealUrl = dirname($lasturl)."/".$redirection;
 				else
 					$strRealUrl = $redirection;
+				$ssl = preg_match('#^https://#i', $strRealUrl);
 			}
 
 			if (strlen($strLocationUrl))
@@ -1853,11 +2541,12 @@ function LoadFile($strRealUrl, $strFilename, $arHeaders = array())
 		$port = $proxyport;
 		$hostname = $parsedurl["host"];
 	}
+	if ($customHost)
+		$host = $customHost;
 
-	$port = $port ? $port : "80";
-
+	$port = $port ? $port : ($ssl ? 443 : 80);
 	SetCurrentStatus(str_replace("#HOST#", $host, LoaderGetMessage("LOADER_LOAD_CONN2HOST")));
-	$sockethandle = @fsockopen($host, $port, $error_id, $error_msg, 10);
+	$sockethandle = fsockopen(($ssl ? 'ssl://' : '').$host, $port, $error_id, $error_msg, 10);
 	if (!$sockethandle)
 	{
 		SetCurrentStatus(str_replace("#HOST#", $host, LoaderGetMessage("LOADER_LOAD_NO_CONN2HOST"))." [".$error_id."] ".$error_msg);
@@ -1865,6 +2554,9 @@ function LoadFile($strRealUrl, $strFilename, $arHeaders = array())
 	}
 	else
 	{
+		if ($debug)
+			file_put_contents($_SERVER['DOCUMENT_ROOT'].'/log.txt',"\n======\nConnected to ".($ssl ? 'ssl://' : '')."$host:$port\n", 8);
+
 		if (!$parsedurl["path"])
 			$parsedurl["path"] = "/";
 
@@ -1902,6 +2594,8 @@ function LoadFile($strRealUrl, $strFilename, $arHeaders = array())
 		while (($result = fgets($sockethandle, 4096)) && $result!="\r\n")
 			$replyheader .= $result;
 
+		if ($debug)
+			file_put_contents($_SERVER['DOCUMENT_ROOT'].'/log.txt',"\n======\n".$request."\n\n".$replyheader, 8);
 		$ar_replyheader = explode("\r\n", $replyheader);
 
 		$replyproto = "";
@@ -2014,6 +2708,7 @@ class CTar
 	var $DirCount = 0;
 	var $ReadBlockMax = 2000;
 	var $ReadBlockCurrent = 0;
+	var $ReadFileSize = 0;
 	var $header = null;
 	var $ArchiveSizeLimit;
 	const BX_EXTRA = 'BX0000';
@@ -2021,6 +2716,8 @@ class CTar
 	var $BufferSize;
 	var $Buffer;
 	var $dataSizeCache = array();
+	var $EncryptKey;
+	var $prefix = '';
 
 	##############
 	# READ
@@ -2049,13 +2746,14 @@ class CTar
 					return $this->res;
 				}
 
-				if (($version = trim($data['version'])) != '1.0')
+				$version = trim($data['version']);
+				if (version_compare($version, '1.2', '>'))
 					return $this->Error('Unsupported archive version: '.$version, 'ENC_VER');
 
 				$key = $this->getEncryptKey();
 				$this->BlockHeader = $this->Block = 1;
 
-				if (!$key || self::substr($str, 0, 256) != mcrypt_decrypt(MCRYPT_BLOWFISH, $key, $data['enc'], MCRYPT_MODE_ECB, pack("a8",$key)))
+				if (!$key || self::substr($str, 0, 256) != self::decrypt($data['enc'], $key))
 					return $this->Error('Invalid encryption key', 'ENC_KEY');
 			}
 		}
@@ -2070,7 +2768,7 @@ class CTar
 			if ($str === '' && $this->openNext($bIgnoreOpenNextError))
 				$str = $this->gzip ? gzread($this->res, $this->BufferSize) : fread($this->res, $this->BufferSize);
 			if ($str !== '' && $key = $this->getEncryptKey())
-				$str = mcrypt_decrypt(MCRYPT_BLOWFISH, $key, $str, MCRYPT_MODE_ECB, pack("a8",$key));
+				$str = self::decrypt($str, $key);
 			$this->Buffer = $str;
 		}
 
@@ -2087,7 +2785,7 @@ class CTar
 
 	function SkipFile()
 	{
-		if ($this->Skip(ceil($this->header['size']/512)))
+		if ($this->Skip(ceil(intval($this->header['size'])/512)))
 		{
 			$this->header = null;
 			return true;
@@ -2157,7 +2855,7 @@ class CTar
 		$chk = $data['devmajor'].$data['devminor'];
 
 		if (!is_numeric(trim($data['checksum'])) || $chk!='' && $chk!=0)
-			return $this->Error('Archive is corrupted, wrong block: '.($this->Block-1));
+			return $this->Error('Archive is corrupted, wrong block: '.($this->Block-1).', file: '.$this->file.', md5sum: '.md5_file($this->file));
 
 		$header['filename'] = trim(trim($data['prefix'], "\x00").'/'.trim($data['filename'], "\x00"),'/');
 		$header['mode'] = OctDec($data['mode']);
@@ -2173,6 +2871,7 @@ class CTar
 
 		if ($header['type']=='L') // Long header
 		{
+			$filename = '';
 			$n = ceil($header['size']/512);
 			for ($i = 0; $i < $n; $i++)
 				$filename .= $this->readBlock();
@@ -2221,35 +2920,35 @@ class CTar
 		
 			if ($this->ReadBlockCurrent == 0)
 			{
-				if ($header['type'] == 5) // dir
+				if ($header['type']==5) // dir
 				{
 					if(!file_exists($f) && !self::xmkdir($f))
-						return $this->Error('Can\'t create folder: '.$f);
+						return $this->ErrorAndSkip('Can\'t create folder: '.$f);
 					//chmod($f, $header['mode']);
 				}
 				else // file
 				{
 					if (!self::xmkdir($dirname = dirname($f)))
-						return $this->Error('Can\'t create folder: '.$dirname);
+						return $this->ErrorAndSkip('Can\'t create folder: '.$dirname);
 					elseif (($rs = fopen($f, 'wb'))===false)
-						return $this->Error('Can\'t create file: '.$f);
+						return $this->ErrorAndSkip('Can\'t create file: '.$f);
 				}
 			}
 			else
 				return $this->Skip($this->ReadBlockCurrent);
 		}
-		else // файл уже частично распакован, продолжаем на том же хите
+		else // С„Р°Р№Р» СѓР¶Рµ С‡Р°СЃС‚РёС‡РЅРѕ СЂР°СЃРїР°РєРѕРІР°РЅ, РїСЂРѕРґРѕР»Р¶Р°РµРј РЅР° С‚РѕРј Р¶Рµ С…РёС‚Рµ
 		{
 			$header = $this->header;
 			$this->lastPath = $f = $this->path.'/'.$header['filename'];
 		}
 
-		if ($header['type'] != 5) // пишем контент в файл 
+		if ($header['type'] != 5) // РїРёС€РµРј РєРѕРЅС‚РµРЅС‚ РІ С„Р°Р№Р»
 		{
 			if (!$rs)
 			{
 				if (($rs = fopen($f, 'ab'))===false)
-					return $this->Error('Can\'t open file: '.$f);
+					return $this->ErrorAndSkip('Can\'t open file: '.$f);
 			}
 
 			$i = 0;
@@ -2269,9 +2968,10 @@ class CTar
 			}
 			fclose($rs);
 
+			if (($s = filesize($f)) != $header['size'])
+				return $this->Error('File size is wrong: '.$header['filename'].' (real: '.$s.'  expected: '.$header['size'].')');
+
 			//chmod($f, $header['mode']);
-			if (($s=filesize($f)) != $header['size'])
-				return $this->Error('File size is wrong: '.$header['filename'].' (actual: '.$s.'  expected: '.$header['size'].')');
 		}
 
 		if ($this->header['type']==5)
@@ -2299,10 +2999,12 @@ class CTar
 		return false;
 	}
 
-	function getLastNum($file)
+	public static function getLastNum($file)
 	{
 		$file = self::getFirstName($file);
 
+		if (!file_exists($file))
+			return false;
 		$f = fopen($file, 'rb');
 		fseek($f, 12);
 		if (fread($f, 2) == 'LN')
@@ -2317,7 +3019,7 @@ class CTar
 	##############
 
 	##############
-	# WRITE 
+	# WRITE
 	# {
 	function openWrite($file)
 	{
@@ -2331,7 +3033,7 @@ class CTar
 
 
 		$this->Block = 0;
-		while(file_exists($file1 = $this->getNextName($file))) // находим последний архив
+		while(file_exists($file1 = $this->getNextName($file))) // РЅР°С…РѕРґРёРј РїРѕСЃР»РµРґРЅРёР№ Р°СЂС…РёРІ
 		{
 			$this->Block += ceil($this->ArchiveSizeLimit / 512);
 			$file = $file1;
@@ -2342,7 +3044,7 @@ class CTar
 			return $this->Error('Can\'t get data size: '.$file);
 
 		$this->Block += $size / 512;
-		if ($size >= $this->ArchiveSizeLimit) // если последний архив полон
+		if ($size >= $this->ArchiveSizeLimit) // РµСЃР»Рё РїРѕСЃР»РµРґРЅРёР№ Р°СЂС…РёРІ РїРѕР»РѕРЅ
 		{
 			$file = $file1;
 			$size = 0;
@@ -2350,10 +3052,11 @@ class CTar
 		$this->ArchiveSizeCurrent = $size;
 
 		$res = $this->open($file, 'a');
-		if ($res && $this->Block == 0 && ($key = $this->getEncryptKey())) // запишем служебный заголовок для зашифрованного архива
+		if ($res && $this->Block == 0 && ($key = $this->getEncryptKey())) // Р·Р°РїРёС€РµРј СЃР»СѓР¶РµР±РЅС‹Р№ Р·Р°РіРѕР»РѕРІРѕРє РґР»СЏ Р·Р°С€РёС„СЂРѕРІР°РЅРЅРѕРіРѕ Р°СЂС…РёРІР°
 		{
-			$enc = pack("a100a90a10a56",md5(uniqid(rand(), true)), self::BX_SIGNATURE, "1.0", "");
-			$enc .= mcrypt_encrypt(MCRYPT_BLOWFISH, $key, $enc, MCRYPT_MODE_ECB, pack("a8",$key));
+			$ver = function_exists('openssl_encrypt') ? '1.2' : '1.1';
+			$enc = pack("a100a90a10a56",md5(uniqid(rand(), true)), self::BX_SIGNATURE, $ver, "");
+			$enc .= $this->encrypt($enc, $key);
 			if (!($this->gzip ? gzwrite($this->res, $enc) : fwrite($this->res, $enc)))
 				return $this->Error('Error writing to file');
 			$this->Block = 1;
@@ -2362,7 +3065,7 @@ class CTar
 		return $res;
 	}
 
-	// создадим пустой gzip с экстра полем
+	// СЃРѕР·РґР°РґРёРј РїСѓСЃС‚РѕР№ gzip СЃ СЌРєСЃС‚СЂР° РїРѕР»РµРј
 	function createEmptyGzipExtra($file)
 	{
 		if (file_exists($file))
@@ -2373,7 +3076,9 @@ class CTar
 		gzwrite($f,'');
 		gzclose($f);
 
-		$data = file_get_contents($file);
+		// $data = file_get_contents($file);
+		$data = "\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\x03\x00\x00\x00\xff\xff\x03\x00\x00\x00\x00\x00\x00\x00\x00\x00"; // buggy zlib 1.2.7
+
 
 		if (!($f = fopen($file, 'w')))
 			return $this->Error('Can\'t open file for writing: '.$file);
@@ -2382,7 +3087,7 @@ class CTar
 		if ($ar['FLG'] != 0)
 			return $this->Error('Error writing extra field: already exists');
 
-		$EXTRA = "\x00\x00\x00\x00".self::BX_EXTRA; // 10 байт
+		$EXTRA = "\x00\x00\x00\x00".self::BX_EXTRA; // 10 Р±Р°Р№С‚
 		fwrite($f,$ar['bin0']."\x04".$ar['bin1'].chr(self::strlen($EXTRA))."\x00".$EXTRA.self::substr($data,10));
 		fclose($f);
 		return true;
@@ -2423,7 +3128,7 @@ class CTar
 		$this->Buffer = '';
 
 		if ($key = $this->getEncryptKey())
-			$str = mcrypt_encrypt(MCRYPT_BLOWFISH, $key, $str, MCRYPT_MODE_ECB, pack("a8",$key));
+			$str = $this->encrypt($str, $key);
 
 		return $this->gzip ? gzwrite($this->res, $str) : fwrite($this->res, $str);
 	}
@@ -2441,7 +3146,7 @@ class CTar
 	function addFile($f)
 	{
 		$f = str_replace('\\', '/', $f);
-		$path = self::substr($f,self::strlen($this->path) + 1);
+		$path = $this->prefix.self::substr($f,self::strlen($this->path) + 1);
 		if ($path == '')
 			return true;
 		if (self::strlen($path)>512)
@@ -2454,6 +3159,7 @@ class CTar
 
 		if ($this->ReadBlockCurrent == 0) // read from start
 		{
+			$this->ReadFileSize = $ar['size'];
 			if (self::strlen($path) > 100) // Long header
 			{
 				$ar0 = $ar;
@@ -2476,7 +3182,7 @@ class CTar
 		if ($ar['type'] == 0 && $ar['size'] > 0) // File
 		{
 			if (!($rs = fopen($f, 'rb')))
-				return $this->Error('Error reading file: '.$f);
+				return $this->Error('Error opening file: '.$f);
 
 			if ($this->ReadBlockCurrent)
 				fseek($rs, $this->ReadBlockCurrent * 512);
@@ -2484,9 +3190,13 @@ class CTar
 			$i = 0;
 			while(!feof($rs) && ('' !== $str = fread($rs,512)))
 			{
+				if ($this->ReadFileSize && $this->ReadBlockCurrent * 512 > $this->ReadFileSize)
+					return $this->Error('File has changed while reading: '.$f);
 				$this->ReadBlockCurrent++;
 				if (feof($rs))
 					$str = pack("a512", $str);
+				elseif (self::strlen($str) != 512)
+					return $this->Error('Error reading from file: '.$f);
 
 				if (!$this->writeBlock($str))
 				{
@@ -2510,7 +3220,7 @@ class CTar
 	##############
 
 	##############
-	# BASE 
+	# BASE
 	# {
 	function open($file, $mode='r')
 	{
@@ -2518,15 +3228,15 @@ class CTar
 		$this->mode = $mode;
 
 		if (is_dir($file))
-			return $this->Error('File is a directory: '.$file);
+			return $this->Error('File is directory: '.$file);
 
-		if ($this->EncryptKey && !function_exists('mcrypt_encrypt'))
-			return $this->Error('Function &quot;mcrypt_encrypt&quot; is not available');
+		if ($this->EncryptKey && !function_exists('mcrypt_encrypt') && !function_exists('openssl_encrypt'))
+			return $this->Error('Function mcrypt_encrypt/openssl_encrypt is not available');
 		
 		if ($mode == 'r' && !file_exists($file))
 			return $this->Error('File does not exist: '.$file);
 
-		if ($this->gzip) 
+		if ($this->gzip)
 		{
 			if(!function_exists('gzopen'))
 				return $this->Error('Function &quot;gzopen&quot; is not available');
@@ -2554,7 +3264,7 @@ class CTar
 
 			if ($this->mode == 'a')
 			{
-				// добавим фактический размер всех несжатых данных в extra поле
+				// РґРѕР±Р°РІРёРј С„Р°РєС‚РёС‡РµСЃРєРёР№ СЂР°Р·РјРµСЂ РІСЃРµС… РЅРµСЃР¶Р°С‚С‹С… РґР°РЅРЅС‹С… РІ extra РїРѕР»Рµ
 				$f = fopen($this->file, 'rb+');
 				fseek($f, 18);
 				fwrite($f, pack("V", $this->ArchiveSizeCurrent));
@@ -2562,7 +3272,7 @@ class CTar
 
 				$this->dataSizeCache[$this->file] = $this->ArchiveSizeCurrent;
 
-				// сохраним номер последней части в первый архив для многотомных архивов
+				// СЃРѕС…СЂР°РЅРёРј РЅРѕРјРµСЂ РїРѕСЃР»РµРґРЅРµР№ С‡Р°СЃС‚Рё РІ РїРµСЂРІС‹Р№ Р°СЂС…РёРІ РґР»СЏ РјРЅРѕРіРѕС‚РѕРјРЅС‹С… Р°СЂС…РёРІРѕРІ
 				if (preg_match('#^(.+)\.([0-9]+)$#', $this->file, $regs))
 				{
 					$f = fopen($regs[1], 'rb+');
@@ -2574,9 +3284,10 @@ class CTar
 		}
 		else
 			fclose($this->res);
+		clearstatcache();
 	}
 
-	function getNextName($file = '')
+	public function getNextName($file = '')
 	{
 		if (!$file)
 			$file = $this->file;
@@ -2606,21 +3317,21 @@ class CTar
 		return $sum;
 	}
 
-	static function substr($s, $a, $b = null)
+	public static function substr($s, $a, $b = null)
 	{
 		if (function_exists('mb_orig_substr'))
 			return $b === null ? mb_orig_substr($s, $a) : mb_orig_substr($s, $a, $b);
 		return $b === null ? substr($s, $a) : substr($s, $a, $b);
 	}
 
-	static function strlen($s)
+	public static function strlen($s)
 	{
 		if (function_exists('mb_orig_strlen'))
 			return mb_orig_strlen($s);
 		return strlen($s);
 	}
 
-	static function strpos($s, $a)
+	public static function strpos($s, $a)
 	{
 		if (function_exists('mb_orig_strpos'))
 			return mb_orig_strpos($s, $a);
@@ -2665,7 +3376,16 @@ class CTar
 		return false;
 	}
 
-	function xmkdir($dir)
+	function ErrorAndSkip($str = '', $code = '')
+	{
+		$this->Error($str, $code);
+		$this->SkipFile();
+		if ($this->readHeader() === 0)
+			$this->BlockHeader = $this->Block;
+		return false;
+	}
+
+	public static function xmkdir($dir)
 	{
 		if (!file_exists($dir))
 		{
@@ -2715,19 +3435,38 @@ class CTar
 		$ar['gid'] = $info['gid'];
 		$ar['size'] = $ar['type']==5 ? 0 : $info['size'];
 		$ar['mtime'] = $info['mtime'];
-		$ar['filename'] = $path;
+		$ar['filename'] = $this->prefix.$path;
 
 		return $ar;
 	}
 
-	function getCheckword($key)
+	public static function getCheckword($key)
 	{
 		return md5('BITRIXCLOUDSERVICE'.$key);
 	}
 
-	function getFirstName($file)
+	public static function getFirstName($file)
 	{
 		return preg_replace('#\.[0-9]+$#','',$file);
+	}
+
+	public static function encrypt($data, $md5_key)
+	{
+		if ($m = self::strlen($data)%8)
+			$data .= str_repeat("\x00",  8 - $m);
+		if (function_exists('openssl_encrypt'))
+			return openssl_encrypt($data, 'BF-ECB', $md5_key, OPENSSL_RAW_DATA | OPENSSL_NO_PADDING);
+		else
+			return mcrypt_encrypt(MCRYPT_BLOWFISH, $md5_key, $data, MCRYPT_MODE_ECB);
+	}
+
+	public static function decrypt($data, $md5_key)
+	{
+		if (function_exists('openssl_encrypt'))
+			$val = openssl_decrypt($data, 'BF-ECB', $md5_key, OPENSSL_RAW_DATA | OPENSSL_NO_PADDING);
+		else
+			$val = mcrypt_decrypt(MCRYPT_BLOWFISH, $md5_key, $data, MCRYPT_MODE_ECB);
+		return $val;
 	}
 
 	# }
@@ -2744,25 +3483,29 @@ class CTarRestore extends CTar
 			$dr = str_replace(array('/','\\'),'',$_SERVER['DOCUMENT_ROOT']);
 			$f = str_replace(array('/','\\'),'',$this->path.'/'.$header['filename']);
 
-			if ($header['type'] != 5 && self::strpos($f, $dr.'bitrixmodules') === 0)
+			if ($header['type'] != 5 && (self::strpos($f, $dr.'bitrixmodules') === 0 || self::strpos($f, $dr.'bitrixcomponentsbitrix') === 0))
 			{
 				if (!file_exists(RESTORE_FILE_LIST))
 				{
 					self::xmkdir($_SERVER['DOCUMENT_ROOT'].'/bitrix/tmp');
-					file_put_contents(RESTORE_FILE_LIST, '<'.'?'."\n");
+					file_put_contents(RESTORE_FILE_LIST, '<?php die(); ?'.">\n");
 				}
-				file_put_contents(RESTORE_FILE_LIST, '$a[\''.addslashes(self::substr(str_replace('\\','/',$header['filename']), 15))."'] = 1;\n", 8); // strlen(bitrix/modules/) = 15
+				file_put_contents(RESTORE_FILE_LIST, addslashes(self::substr(str_replace('\\','/',$header['filename']), 7))."\n", 8); // strlen(bitrix/) = 7
 			}
 
 			if ($f == $dr.'restore.php')
 				return true;
 			elseif ($f == $dr.'.htaccess')
+			{
 				$header['filename'] .= '.restore';
+				$this->header['filename'] = $header['filename'];
+			}
 			elseif ($f == $dr.'bitrixphp_interfacedbconn.php' && file_exists($_SERVER['DOCUMENT_ROOT'].'/bitrix/php_interface/dbconn.php'))
 				$header['filename'] = str_replace('dbconn.php','dbconn.restore.php',$header['filename']);
 			elseif (preg_match('#[^\x00-\x7f]#', $header['filename'])) // non ASCII character detected
 			{
-				if (false === $this->header['filename'] = $header['filename'] = $this->DecodeFileName($header['filename']))
+				$this->header['filename'] = $header['filename'] = $this->DecodeFileName($header['filename']);
+				if ($this->header['filename'] === false)
 					return false;
 			}
 		}
@@ -2783,11 +3526,8 @@ class CTarRestore extends CTar
 			else
 				$this->EncCurrent = 'utf-8';
 
-			if (!function_exists('mb_convert_encoding'))
-				return $this->Error(getMsg('ERR_CANT_DECODE'));
-			$str0 = mb_convert_encoding($str, 'cp1251', 'utf8');
-			if (preg_match("/[\xC0-\xFF]/",$str0))
-				$this->EncRemote = 'utf8';
+			if (preg_match("/[\xC0-\xDF][\x80-\xBF]{1}|[\xE0-\xEF][\x80-\xBF]{2}|[\xF0-\xF7][\x80-\xBF]{3}/", $str)) // 110xxxxx 10xxxxxx | 1110xxxx 10xxxxxx 10xxxxxx | 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
+				$this->EncRemote = 'utf-8';
 			elseif (preg_match("/[\xC0-\xFF]/",$str))
 				$this->EncRemote = 'cp1251';
 			else
@@ -2811,7 +3551,7 @@ function img($name)
 {
 	if (file_exists($_SERVER['DOCUMENT_ROOT'].'/images/'.$name))
 		return '/images/'.$name;
-	return 'http://www.1c-bitrix.ru/images/bitrix_setup/'.$name;
+	return 'https://www.1c-bitrix.ru/images/bitrix_setup/'.$name;
 }
 
 function bx_accelerator_reset()
@@ -2845,10 +3585,10 @@ function CheckHtaccessAndWarn()
 {
 	$tmp = $_SERVER['DOCUMENT_ROOT'].'/.htaccess';
 	$tmp1 = $tmp.'.restore';
-	if (!file_exists($tmp1)) // в архиве не было .htaccess
+	if (!file_exists($tmp1))
 		return '';
 
-	if (file_exists($tmp)) // существует какой-то .htaccess в корне
+	if (file_exists($tmp))
 	{
 		if (trim(file_get_contents($tmp)) == trim(file_get_contents($tmp1)))
 		{
@@ -2967,7 +3707,7 @@ class CDirScan
 		#############################
 		# DIR
 		#############################
-			if (!$this->startPath) // если начальный путь найден или не задан
+			if (!$this->startPath)
 			{
 				$r = $this->ProcessDirBefore($dir);
 				if ($r === false)
@@ -2995,7 +3735,7 @@ class CDirScan
 			}
 			closedir($handle);
 
-			if (!$this->startPath) // если начальный путь найден или не задан
+			if (!$this->startPath)
 			{
 				if ($this->ProcessDirAfter($dir) === false)
 					return false;
@@ -3010,7 +3750,7 @@ class CDirScan
 			$r = $this->ProcessFile($dir);
 			if ($r === false)
 				return false;
-			elseif ($r === 'BREAK') // если файл обработан частично
+			elseif ($r === 'BREAK')
 				return $r;
 			$this->FileCount++;
 		}
@@ -3023,7 +3763,7 @@ class CDirRealScan extends CDirScan
 	function Scan($dir)
 	{
 		if (!$this->cut)
-			$this->cut = CTar::strlen($dir) + 1; // 1 for "/"
+			$this->cut = CTar::strlen($_SERVER['DOCUMENT_ROOT'].'/bitrix/');
 		return parent::Scan($dir);
 	}
 
@@ -3035,7 +3775,7 @@ class CDirRealScan extends CDirScan
 		if (!$a)
 			return;
 		$k = CTar::substr($f, $this->cut);
-		if (!$a[$k])
+		if (!isset($a[$k]))
 		{
 			$to = RESTORE_FILE_DIR.'/'.$k;
 			CTar::xmkdir(dirname($to));
@@ -3044,4 +3784,4 @@ class CDirRealScan extends CDirScan
 		return true;
 	}
 }
-?>
+
